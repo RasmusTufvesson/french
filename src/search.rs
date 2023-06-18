@@ -1,17 +1,27 @@
 use levenshtein::levenshtein;
 
+pub enum Gender {
+    Female,
+    Male,
+}
+
+pub enum AdjectiveForms {
+    Regular(String),
+    Irregular(String, String, String, String, String, String, String)
+}
+
 pub enum Category {
-    Noun,
+    Noun(Gender),
     Verb,
-    Adjective,
+    Adjective(AdjectiveForms),
 }
 
 impl Category {
     pub fn to_u8(&self) -> u8 {
         match self {
-            Self::Noun => 0b00000001,
+            Self::Noun(_) => 0b00000001,
             Self::Verb => 0b00000010,
-            Self::Adjective => 0b00000100,
+            Self::Adjective(_) => 0b00000100,
         }
     }
 }
