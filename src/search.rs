@@ -5,23 +5,23 @@ pub enum Gender {
     Male,
 }
 
-pub enum AdjectiveForms {
+pub enum VerbForms {
     Regular(String),
     Irregular(String, String, String, String, String, String, String)
 }
 
 pub enum Category {
     Noun(Gender),
-    Verb,
-    Adjective(AdjectiveForms),
+    Verb(VerbForms),
+    Adjective(String, String),
 }
 
 impl Category {
     pub fn to_u8(&self) -> u8 {
         match self {
             Self::Noun(_) => 0b00000001,
-            Self::Verb => 0b00000010,
-            Self::Adjective(_) => 0b00000100,
+            Self::Verb(_) => 0b00000010,
+            Self::Adjective(..) => 0b00000100,
         }
     }
 }
