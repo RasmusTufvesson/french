@@ -109,7 +109,7 @@ impl Display for Category {
 pub struct Item {
     pub swedish: Option<String>,
     pub english: Option<String>,
-    category: Category,
+    pub category: Category,
     category_int: u8,
 }
 

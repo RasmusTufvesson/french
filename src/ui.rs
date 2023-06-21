@@ -6,6 +6,7 @@ use crate::search::{Search, Item, Query, Language, Category, Gender, VerbForms};
 enum Tab {
     Words,
     Sentences,
+    Verbs,
 }
 
 enum PopupWindow {
@@ -57,6 +58,7 @@ pub struct App {
     search_sentences_file: String,
     categories: SearchCategories,
     min_num_answers: usize,
+    results_verbs: (Option<String>, Option<String>, String, VerbForms),
 }
 
 impl App {
@@ -75,6 +77,7 @@ impl App {
             search_sentences_file,
             categories: SearchCategories::new(),
             min_num_answers: 0,
+            results_verbs: (None, None, "".to_string(), VerbForms::Regular("".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string())),
         };
         app
     }
@@ -87,6 +90,18 @@ impl App {
             }
             Tab::Sentences => {
                 self.results_sentences = self.search_sentences.search(&self.gen_query(), self.num_answers);
+            }
+            Tab::Verbs => {
+                let results = self.search_words.search(&Query::new(&self.query_string, &self.language, 0b00000010), 1);
+                if results.len() != 0 {
+                    let result = &results[0].1;
+                    match &result.category {
+                        Category::Verb(name, form) => {
+                            self.results_verbs = (result.swedish.clone(), result.english.clone(), name.clone(), form.clone());
+                        }
+                        _ => {}
+                    }
+                }
             }
         }
     }
@@ -111,6 +126,13 @@ impl eframe::App for App {
                 if ui.button("Sentences").clicked() {
                     self.tab = Tab::Sentences;
                     self.results_sentences.clear();
+                    self.query_string.clear();
+                    self.popup = PopupWindow::None;
+                    self.gen_results();
+                }
+                if ui.button("Verbs").clicked() {
+                    self.tab = Tab::Verbs;
+                    self.results_verbs = (None, None, "".to_string(), VerbForms::Regular("".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string()));
                     self.query_string.clear();
                     self.popup = PopupWindow::None;
                     self.gen_results();
@@ -142,6 +164,22 @@ impl eframe::App for App {
                                 self.popup = PopupWindow::AddSentence("".to_string(), "".to_string(), "".to_string());
                             }
                             ui.separator();
+                            egui::ComboBox::from_id_source("Language")
+                                .selected_text(format!("{}", self.language))
+                                .show_ui(ui, |ui| {
+                                    if ui.selectable_value(&mut self.language, Language::French, "French").clicked() |
+                                    ui.selectable_value(&mut self.language, Language::Swedish, "Swedish").clicked() |
+                                    ui.selectable_value(&mut self.language, Language::English, "English").clicked() {
+                                        self.results_sentences.clear();
+                                        self.query_string.clear();
+                                        self.popup = PopupWindow::None;
+                                        self.gen_results();
+                                    }
+                                }
+                            );
+                            ui.separator();
+                        }
+                        Tab::Verbs => {
                             egui::ComboBox::from_id_source("Language")
                                 .selected_text(format!("{}", self.language))
                                 .show_ui(ui, |ui| {
@@ -213,6 +251,52 @@ impl eframe::App for App {
                                 ui.label(format!("{}", item.tooltip()));
                             });
                         }
+                    }
+                    Tab::Verbs => {
+                        egui::Grid::new("verb_grid")
+                            .num_columns(2)
+                            .spacing([40.0, 4.0])
+                            .striped(true)
+                            .show(ui, |ui| {
+                                let mut translation = false;
+                                if let Some(string) = &self.results_verbs.0 {
+                                    ui.label("Swedish");
+                                    ui.label(string);
+                                    ui.end_row();
+                                    translation = true;
+                                }
+                                if let Some(string) = &self.results_verbs.1 {
+                                    ui.label("English");
+                                    ui.label(string);
+                                    ui.end_row();
+                                    translation = true;
+                                }
+                                if translation {
+                                    ui.end_row();
+                                }
+                                ui.label("Name");
+                                ui.label(&self.results_verbs.2);
+                                ui.end_row();
+                                let (VerbForms::Regular(je, tu, il, nous, vous, ils) | VerbForms::Irregular(je, tu, il, nous, vous, ils)) = &self.results_verbs.3;
+                                ui.label("Je");
+                                ui.label(je);
+                                ui.end_row();
+                                ui.label("Tu");
+                                ui.label(tu);
+                                ui.end_row();
+                                ui.label("Il/elle/on");
+                                ui.label(il);
+                                ui.end_row();
+                                ui.label("Nous");
+                                ui.label(nous);
+                                ui.end_row();
+                                ui.label("Vous");
+                                ui.label(vous);
+                                ui.end_row();
+                                ui.label("Ils/elles");
+                                ui.label(ils);
+                                ui.end_row();
+                            });
                     }
                 }
             });
