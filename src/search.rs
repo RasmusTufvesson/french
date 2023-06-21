@@ -105,7 +105,7 @@ impl Display for Category {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Item {
     pub swedish: Option<String>,
     pub english: Option<String>,
@@ -128,7 +128,7 @@ impl Item {
                     Category::Noun(string, _) => Some(vec![string.to_owned()]),
                     Category::Verb(base, form) => {
                         match form {
-                            VerbForms::Regular(je, tu, il, nous, vous, ils) => Some(vec![je.to_owned(), tu.to_owned(), il.to_owned(), nous.to_owned(), vous.to_owned(), ils.to_owned(), base.to_owned()]),
+                            VerbForms::Regular(je, tu, _, nous, vous, ils) => Some(vec![je.to_owned(), tu.to_owned(), nous.to_owned(), vous.to_owned(), ils.to_owned(), base.to_owned()]),
                             VerbForms::Irregular(je, tu, il, nous, vous, ils) => Some(vec![je.to_owned(), tu.to_owned(), il.to_owned(), nous.to_owned(), vous.to_owned(), ils.to_owned(), base.to_owned()]),
                         }
                     }
@@ -197,15 +197,18 @@ impl Search {
             if let Some(strings) = item.language_strings(&query.language) {
                 if item.category_int & query.search_categories_int != 0 {
                     for string in strings {
-                        let distance = levenshtein(&query.string, &string);
-            
-                        for i in 0..num_answers {
-                            if distance < best_match_scores[i] {
-                                best_match_scores.insert(i, distance);
-                                best_match_scores.truncate(num_answers);
-                                best_matches.insert(i, (string, item.clone()));
-                                best_matches.truncate(num_answers);
-                                break;
+                        let list_item = (string, item.clone());
+                        if !best_matches.contains(&list_item) {
+                            let distance = levenshtein(&query.string, &list_item.0);
+                
+                            for i in 0..num_answers {
+                                if distance < best_match_scores[i] {
+                                    best_match_scores.insert(i, distance);
+                                    best_match_scores.truncate(num_answers);
+                                    best_matches.insert(i, list_item);
+                                    best_matches.truncate(num_answers);
+                                    break;
+                                }
                             }
                         }
                     }
