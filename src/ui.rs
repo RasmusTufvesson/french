@@ -59,22 +59,21 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(_cc: &eframe::CreationContext<'_>, search_words: Search, search_sentences: Search, num_answers: usize, search_words_file: String, search_sentences_file: String) -> Self {
-        let mut app = Self {
+    pub fn new(_cc: &eframe::CreationContext<'_>, search_words: Search, search_sentences: Search, search_words_file: String, search_sentences_file: String) -> Self {
+        let app = Self {
             search_words,
             search_sentences,
             query_string: "".to_string(),
             tab: Tab::Words,
             results_words: vec![],
             results_sentences: vec![],
-            num_answers,
+            num_answers: 0,
             language: Language::French,
             popup: PopupWindow::None,
             search_words_file,
             search_sentences_file,
             categories: SearchCategories::new(),
         };
-        app.gen_results();
         app
     }
 
@@ -179,6 +178,11 @@ impl eframe::App for App {
             ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
                 match self.tab {
                     Tab::Words => {
+                        let num_results = ((ui.available_height() - 26.0) / 17.0).round() as usize;
+                        if num_results != self.num_answers {
+                            self.num_answers = num_results;
+                            self.gen_results();
+                        }
                         for (string, item) in &self.results_words {
                             ui.label(string).on_hover_ui_at_pointer(|ui| {
                                 ui.label(format!("{}", item.tooltip()));
@@ -186,6 +190,11 @@ impl eframe::App for App {
                         }
                     }
                     Tab::Sentences => {
+                        let num_results = ((ui.available_height() - 26.0) / 17.0).round() as usize;
+                        if num_results != self.num_answers {
+                            self.num_answers = num_results;
+                            self.gen_results();
+                        }
                         for (string, item) in &self.results_sentences {
                             ui.label(string).on_hover_ui_at_pointer(|ui| {
                                 ui.label(format!("{}", item.tooltip()));
@@ -406,6 +415,6 @@ pub fn run(search_words: Search, search_sentences: Search, search_words_file: St
     eframe::run_native(
         "French",
         native_options,
-        Box::new(|cc| Box::new(App::new(cc, search_words, search_sentences, 30, search_words_file, search_sentences_file))),
+        Box::new(|cc| Box::new(App::new(cc, search_words, search_sentences, search_words_file, search_sentences_file))),
     )
 }
