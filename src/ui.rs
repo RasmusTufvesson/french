@@ -56,6 +56,7 @@ pub struct App {
     search_words_file: String,
     search_sentences_file: String,
     categories: SearchCategories,
+    min_num_answers: usize,
 }
 
 impl App {
@@ -73,11 +74,13 @@ impl App {
             search_words_file,
             search_sentences_file,
             categories: SearchCategories::new(),
+            min_num_answers: 0,
         };
         app
     }
 
     fn gen_results(&mut self) {
+        self.num_answers = self.min_num_answers;
         match self.tab {
             Tab::Words => {
                 self.results_words = self.search_words.search(&self.gen_query(), self.num_answers);
@@ -179,11 +182,16 @@ impl eframe::App for App {
                 match self.tab {
                     Tab::Words => {
                         let num_results = ((ui.available_height() - 26.0) / 17.0).round() as usize;
-                        if num_results != self.num_answers {
-                            self.num_answers = num_results;
-                            self.gen_results();
+                        if num_results != self.min_num_answers {
+                            self.min_num_answers = num_results;
+                            if self.min_num_answers > self.num_answers {
+                                self.gen_results();
+                            }
                         }
-                        for (string, item) in &self.results_words {
+                        for (i, (string, item)) in self.results_words.iter().enumerate() {
+                            if i >= self.min_num_answers {
+                                break;
+                            }
                             ui.label(string).on_hover_ui_at_pointer(|ui| {
                                 ui.label(format!("{}", item.tooltip()));
                             });
@@ -191,11 +199,16 @@ impl eframe::App for App {
                     }
                     Tab::Sentences => {
                         let num_results = ((ui.available_height() - 26.0) / 17.0).round() as usize;
-                        if num_results != self.num_answers {
-                            self.num_answers = num_results;
-                            self.gen_results();
+                        if num_results != self.min_num_answers {
+                            self.min_num_answers = num_results;
+                            if self.min_num_answers > self.num_answers {
+                                self.gen_results();
+                            }
                         }
-                        for (string, item) in &self.results_sentences {
+                        for (i, (string, item)) in self.results_sentences.iter().enumerate() {
+                            if i >= self.min_num_answers {
+                                break;
+                            }
                             ui.label(string).on_hover_ui_at_pointer(|ui| {
                                 ui.label(format!("{}", item.tooltip()));
                             });
