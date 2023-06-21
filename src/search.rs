@@ -89,7 +89,7 @@ impl Category {
                     VerbForms::Regular(..) => format!("{} ({}, {}), regular verb", name, swedish, english),
                 }
             }
-            Self::Adjective(female, male) => format!("{}/{} ({}, {}), adjective", female, male, swedish, english)
+            Self::Adjective(female, male) => format!("{}/{} ({}, {}), adjective", male, female, swedish, english)
         }
     }
 }

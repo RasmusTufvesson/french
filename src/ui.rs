@@ -160,15 +160,20 @@ impl eframe::App for App {
             });
         });
 
-        egui::SidePanel::left("side_panel").show(ctx, |ui| {
-            ui.heading("Categories");
-
-            if ui.checkbox(&mut self.categories.noun, "Nouns").changed() |
-            ui.checkbox(&mut self.categories.verb, "Verbs").changed() |
-            ui.checkbox(&mut self.categories.adjective, "Adjectives").changed() {
-                self.gen_results();
+        match self.tab {
+            Tab::Words => {
+                egui::SidePanel::left("side_panel").show(ctx, |ui| {
+                    ui.heading("Categories");
+        
+                    if ui.checkbox(&mut self.categories.noun, "Nouns").changed() |
+                    ui.checkbox(&mut self.categories.verb, "Verbs").changed() |
+                    ui.checkbox(&mut self.categories.adjective, "Adjectives").changed() {
+                        self.gen_results();
+                    }
+                });
             }
-        });
+            _ => {}
+        }
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
