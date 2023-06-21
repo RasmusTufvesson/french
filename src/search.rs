@@ -79,8 +79,8 @@ impl Category {
             Self::All(string) => format!("{} ({}, {})", string, swedish, english),
             Self::Noun(string, gender) => {
                 match gender {
-                    Gender::Male => format!("{} ({}, {}), male noun", string, swedish, english),
-                    Gender::Female => format!("{} ({}, {}), female noun", string, swedish, english),
+                    Gender::Male => format!("{} ({}, {}), masculine noun", string, swedish, english),
+                    Gender::Female => format!("{} ({}, {}), feminine noun", string, swedish, english),
                 }
             }
             Self::Verb(name, forms) => {
