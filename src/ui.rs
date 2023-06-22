@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use eframe::{self, egui};
+use eframe::{self, egui::{self, Layout}};
 use crate::search::{Search, Item, Query, Language, Category, Gender, VerbForms};
 
 enum Tab {
@@ -216,47 +216,14 @@ impl eframe::App for App {
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
-                match self.tab {
-                    Tab::Words => {
-                        let num_results = ((ui.available_height() - 26.0) / 17.0).round() as usize;
-                        if num_results != self.min_num_answers {
-                            self.min_num_answers = num_results;
-                            if self.min_num_answers > self.num_answers {
-                                self.gen_results();
-                            }
-                        }
-                        for (i, (string, item)) in self.results_words.iter().enumerate() {
-                            if i >= self.min_num_answers {
-                                break;
-                            }
-                            ui.label(string).on_hover_ui_at_pointer(|ui| {
-                                ui.label(format!("{}", item.tooltip()));
-                            });
-                        }
-                    }
-                    Tab::Sentences => {
-                        let num_results = ((ui.available_height() - 26.0) / 17.0).round() as usize;
-                        if num_results != self.min_num_answers {
-                            self.min_num_answers = num_results;
-                            if self.min_num_answers > self.num_answers {
-                                self.gen_results();
-                            }
-                        }
-                        for (i, (string, item)) in self.results_sentences.iter().enumerate() {
-                            if i >= self.min_num_answers {
-                                break;
-                            }
-                            ui.label(string).on_hover_ui_at_pointer(|ui| {
-                                ui.label(format!("{}", item.tooltip()));
-                            });
-                        }
-                    }
-                    Tab::Verbs => {
+            match self.tab {
+                Tab::Verbs => {
+                    ui.with_layout(Layout::top_down_justified(eframe::emath::Align::Center), |ui| {
                         egui::Grid::new("verb_grid")
                             .num_columns(2)
                             .spacing([40.0, 4.0])
                             .striped(true)
+                            .min_col_width(ui.available_width()/2.0)
                             .show(ui, |ui| {
                                 let mut translation = false;
                                 if let Some(string) = &self.results_verbs.0 {
@@ -297,9 +264,51 @@ impl eframe::App for App {
                                 ui.label(ils);
                                 ui.end_row();
                             });
-                    }
+                    });
                 }
-            });
+                Tab::Words |
+                Tab::Sentences => {
+                    ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
+                        match self.tab {
+                            Tab::Words => {
+                                let num_results = ((ui.available_height() - 26.0) / 17.0).round() as usize;
+                                if num_results != self.min_num_answers {
+                                    self.min_num_answers = num_results;
+                                    if self.min_num_answers > self.num_answers {
+                                        self.gen_results();
+                                    }
+                                }
+                                for (i, (string, item)) in self.results_words.iter().enumerate() {
+                                    if i >= self.min_num_answers {
+                                        break;
+                                    }
+                                    ui.label(string).on_hover_ui_at_pointer(|ui| {
+                                        ui.label(format!("{}", item.tooltip()));
+                                    });
+                                }
+                            }
+                            Tab::Sentences => {
+                                let num_results = ((ui.available_height() - 26.0) / 17.0).round() as usize;
+                                if num_results != self.min_num_answers {
+                                    self.min_num_answers = num_results;
+                                    if self.min_num_answers > self.num_answers {
+                                        self.gen_results();
+                                    }
+                                }
+                                for (i, (string, item)) in self.results_sentences.iter().enumerate() {
+                                    if i >= self.min_num_answers {
+                                        break;
+                                    }
+                                    ui.label(string).on_hover_ui_at_pointer(|ui| {
+                                        ui.label(format!("{}", item.tooltip()));
+                                    });
+                                }
+                            }
+                            _ => {}
+                        }
+                    });
+                }
+            }
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 let response = ui.add_sized([ui.available_width(), 0.], egui::TextEdit::singleline(&mut self.query_string));
                 if response.changed() {
