@@ -11,8 +11,8 @@ enum Tab {
 
 enum PopupWindow {
     None,
-    AddWord(String, String, Category, String),
-    AddSentence(String, String, String),
+    AddWord(String, String, Category, String, Option<usize>),
+    AddSentence(String, String, String, Option<usize>),
 }
 
 struct SearchCategories {
@@ -141,7 +141,7 @@ impl eframe::App for App {
                     match self.tab {
                         Tab::Words => {
                             if ui.button("Add word").clicked() {
-                                self.popup = PopupWindow::AddWord("".to_string(), "".to_string(), Category::All("".to_string()), "".to_string());
+                                self.popup = PopupWindow::AddWord("".to_string(), "".to_string(), Category::All("".to_string()), "".to_string(), None);
                             }
                             ui.separator();
                             egui::ComboBox::from_id_source("Language")
@@ -161,7 +161,7 @@ impl eframe::App for App {
                         }
                         Tab::Sentences => {
                             if ui.button("Add sentence").clicked() {
-                                self.popup = PopupWindow::AddSentence("".to_string(), "".to_string(), "".to_string());
+                                self.popup = PopupWindow::AddSentence("".to_string(), "".to_string(), "".to_string(), None);
                             }
                             ui.separator();
                             egui::ComboBox::from_id_source("Language")
@@ -271,7 +271,7 @@ impl eframe::App for App {
                     ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
                         match self.tab {
                             Tab::Words => {
-                                let num_results = ((ui.available_height() - 26.0) / 17.0).round() as usize;
+                                let num_results = ((ui.available_height() - 24.0) / 17.0).round() as usize;
                                 if num_results != self.min_num_answers {
                                     self.min_num_answers = num_results;
                                     if self.min_num_answers > self.num_answers {
@@ -282,13 +282,26 @@ impl eframe::App for App {
                                     if i >= self.min_num_answers {
                                         break;
                                     }
-                                    ui.label(string).on_hover_ui_at_pointer(|ui| {
+                                    let response = ui.label(string);
+                                    response.clone().on_hover_ui_at_pointer(|ui| {
                                         ui.label(format!("{}", item.tooltip()));
+                                    });
+                                    response.context_menu(|ui| {
+                                        if ui.button("Edit").clicked() {
+                                            ui.close_menu();
+                                            self.popup = PopupWindow::AddWord(match item.swedish.clone() {
+                                                None => "".to_string(),
+                                                Some(val) => val,
+                                            }, match item.english.clone() {
+                                                None => "".to_string(),
+                                                Some(val) => val,
+                                            }, item.category.clone(), "".to_string(), Some(self.search_words.get_item_index(item)));
+                                        }
                                     });
                                 }
                             }
                             Tab::Sentences => {
-                                let num_results = ((ui.available_height() - 26.0) / 17.0).round() as usize;
+                                let num_results = ((ui.available_height() - 24.0) / 17.0).round() as usize;
                                 if num_results != self.min_num_answers {
                                     self.min_num_answers = num_results;
                                     if self.min_num_answers > self.num_answers {
@@ -299,8 +312,24 @@ impl eframe::App for App {
                                     if i >= self.min_num_answers {
                                         break;
                                     }
-                                    ui.label(string).on_hover_ui_at_pointer(|ui| {
+                                    let response = ui.label(string);
+                                    response.clone().on_hover_ui_at_pointer(|ui| {
                                         ui.label(format!("{}", item.tooltip()));
+                                    });
+                                    response.context_menu(|ui| {
+                                        if ui.button("Edit").clicked() {
+                                            ui.close_menu();
+                                            self.popup = PopupWindow::AddSentence(match &item.category {
+                                                Category::All(string) => string.clone(),
+                                                _ => "".to_string(),
+                                            }, match item.swedish.clone() {
+                                                None => "".to_string(),
+                                                Some(val) => val,
+                                            }, match item.english.clone() {
+                                                None => "".to_string(),
+                                                Some(val) => val,
+                                            }, Some(self.search_sentences.get_item_index(item)));
+                                        }
                                     });
                                 }
                             }
@@ -321,14 +350,14 @@ impl eframe::App for App {
         let mut reload = false;
         match &mut self.popup {
             PopupWindow::None => {}
-            PopupWindow::AddWord(swedish, english, ref mut category, any_verb) => {
+            PopupWindow::AddWord(swedish, english, ref mut category, any_verb, edit) => {
                 egui::Window::new("Add word").collapsible(false).show(ctx, |ui| {
                     egui::ComboBox::from_label("Category")
                         .selected_text(format!("{}", category))
                         .show_ui(ui, |ui| {
                             ui.selectable_value(category, Category::Noun("".to_string(), Gender::Male), "Noun");
                             ui.selectable_value(category, Category::Verb("".to_string(), VerbForms::Regular("".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string())), "Verb");
-                            ui.selectable_value(category, Category::Adjective("".to_string(), "".to_string()), "Adjective");
+                            ui.selectable_value(category, Category::Adjective("".to_string(), "".to_string(), "".to_string()), "Adjective");
                             ui.selectable_value(category, Category::All("".to_string()), "Other");
                         }
                     );
@@ -445,7 +474,7 @@ impl eframe::App for App {
                                 }
                             }
                         }
-                        Category::Adjective(female, male) => {
+                        Category::Adjective(female, male, plural) => {
                             ui.horizontal(|ui| {
                                 ui.add(egui::TextEdit::singleline(male));
                                 ui.label("Male");
@@ -453,6 +482,10 @@ impl eframe::App for App {
                             ui.horizontal(|ui| {
                                 ui.add(egui::TextEdit::singleline(female));
                                 ui.label("Female");
+                            });
+                            ui.horizontal(|ui| {
+                                ui.add(egui::TextEdit::singleline(plural));
+                                ui.label("Plural");
                             });
                         }
                         Category::All(string) => {
@@ -463,13 +496,28 @@ impl eframe::App for App {
                         }
                     }
                     ui.horizontal(|ui| {
-                        if ui.button("Add").clicked() {
-                            close = true;
-                            let swedish_val = if swedish.len() > 0 { Some(swedish.clone()) } else { None };
-                            let english_val = if english.len() > 0 { Some(english.clone()) } else { None };
-                            self.search_words.add_item(Item::new(swedish_val, english_val, category.clone()));
-                            self.search_words.save(&self.search_words_file);
-                            reload = true;
+                        match edit {
+                            None => {
+                                if ui.button("Add").clicked() {
+                                    close = true;
+                                    let swedish_val = if swedish.len() > 0 { Some(swedish.clone()) } else { None };
+                                    let english_val = if english.len() > 0 { Some(english.clone()) } else { None };
+                                    self.search_words.add_item(Item::new(swedish_val, english_val, category.clone()));
+                                    self.search_words.save(&self.search_words_file);
+                                    reload = true;
+                                }
+                            }
+                            Some(index) => {
+                                if ui.button("Apply").clicked() {
+                                    close = true;
+                                    let swedish_val = if swedish.len() > 0 { Some(swedish.clone()) } else { None };
+                                    let english_val = if english.len() > 0 { Some(english.clone()) } else { None };
+                                    self.search_words.remove_item(*index);
+                                    self.search_words.add_item(Item::new(swedish_val, english_val, category.clone()));
+                                    self.search_words.save(&self.search_words_file);
+                                    reload = true;
+                                }
+                            }
                         }
                         if ui.button("Cancel").clicked() {
                             close = true;
@@ -477,7 +525,7 @@ impl eframe::App for App {
                     });
                 });
             }
-            PopupWindow::AddSentence(french, swedish, english) => {
+            PopupWindow::AddSentence(french, swedish, english, edit) => {
                 egui::Window::new("Add sentence").collapsible(false).show(ctx, |ui| {
                     ui.horizontal(|ui| {
                         ui.add(egui::TextEdit::singleline(french));
@@ -492,13 +540,28 @@ impl eframe::App for App {
                         ui.label("English");
                     });
                     ui.horizontal(|ui| {
-                        if ui.button("Add").clicked() {
-                            close = true;
-                            let swedish_val = if swedish.len() > 0 { Some(swedish.clone()) } else { None };
-                            let english_val = if english.len() > 0 { Some(english.clone()) } else { None };
-                            self.search_sentences.add_item(Item::new(swedish_val, english_val, Category::All(french.clone())));
-                            self.search_sentences.save(&self.search_sentences_file);
-                            reload = true;
+                        match edit {
+                            None => {
+                                if ui.button("Add").clicked() {
+                                    close = true;
+                                    let swedish_val = if swedish.len() > 0 { Some(swedish.clone()) } else { None };
+                                    let english_val = if english.len() > 0 { Some(english.clone()) } else { None };
+                                    self.search_sentences.add_item(Item::new(swedish_val, english_val, Category::All(french.clone())));
+                                    self.search_sentences.save(&self.search_sentences_file);
+                                    reload = true;
+                                }
+                            }
+                            Some(index) => {
+                                if ui.button("Apply").clicked() {
+                                    close = true;
+                                    let swedish_val = if swedish.len() > 0 { Some(swedish.clone()) } else { None };
+                                    let english_val = if english.len() > 0 { Some(english.clone()) } else { None };
+                                    self.search_sentences.remove_item(*index);
+                                    self.search_sentences.add_item(Item::new(swedish_val, english_val, Category::All(french.clone())));
+                                    self.search_sentences.save(&self.search_sentences_file);
+                                    reload = true;
+                                }
+                            }
                         }
                         if ui.button("Cancel").clicked() {
                             close = true;

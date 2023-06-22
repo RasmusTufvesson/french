@@ -52,7 +52,7 @@ impl VerbForms {
 pub enum Category {
     Noun(String, Gender),
     Verb(String, VerbForms),
-    Adjective(String, String),
+    Adjective(String, String, String),
     All(String),
 }
 
@@ -89,7 +89,7 @@ impl Category {
                     VerbForms::Regular(..) => format!("{} ({}, {}), regular verb", name, swedish, english),
                 }
             }
-            Self::Adjective(female, male) => format!("{}/{} ({}, {}), adjective", male, female, swedish, english)
+            Self::Adjective(female, male, plural) => format!("{}/{}/{} ({}, {}), adjective", male, female, plural, swedish, english)
         }
     }
 }
@@ -124,7 +124,7 @@ impl Item {
             Language::French => {
                 match &self.category {
                     Category::All(string) => Some(vec![string.to_owned()]),
-                    Category::Adjective(female, male) => Some(vec![female.to_owned(), male.to_owned()]),
+                    Category::Adjective(female, male, plural) => Some(vec![female.to_owned(), male.to_owned(), plural.to_owned()]),
                     Category::Noun(string, _) => Some(vec![string.to_owned()]),
                     Category::Verb(base, form) => {
                         match form {
@@ -243,5 +243,13 @@ impl Search {
                 }
             }
         }
+    }
+
+    pub fn get_item_index(&self, item: &Item) -> usize {
+        self.items.iter().position(|x| x == item).unwrap()
+    }
+
+    pub fn remove_item(&mut self, item: usize) {
+        self.items.remove(item);
     }
 }
