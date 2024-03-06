@@ -311,6 +311,7 @@ impl eframe::App for App {
                                         self.gen_results();
                                     }
                                 }
+                                let mut update_results = false;
                                 for (i, (string, item)) in self.results_words.iter().enumerate() {
                                     if i >= self.min_num_answers {
                                         break;
@@ -320,6 +321,14 @@ impl eframe::App for App {
                                         ui.label(format!("{}", item.tooltip()));
                                     });
                                     response.context_menu(|ui| {
+                                        if let Category::Verb(name, _) = &item.category {
+                                            if ui.button("Open in verb view").clicked() {
+                                                ui.close_menu();
+                                                self.tab = Tab::Verbs;
+                                                self.query_string = name.clone();
+                                                update_results = true;
+                                            }
+                                        }
                                         if ui.button("Edit").clicked() {
                                             ui.close_menu();
                                             self.popup = PopupWindow::AddWord(match item.swedish.clone() {
@@ -331,6 +340,9 @@ impl eframe::App for App {
                                             }, item.category.clone(), "".to_string(), Some(self.search_words.get_item_index(item)));
                                         }
                                     });
+                                }
+                                if update_results {
+                                    self.gen_results();
                                 }
                             }
                             Tab::Sentences => {
@@ -576,9 +588,7 @@ impl eframe::App for App {
                                         ui.label("Ils/elles");
                                     });
                                     if changed != "" {
-                                        if let Some(forms) = VerbForms::gen_from_regular(changed) {
-                                            (*je, *tu, *il, *nous, *vous, *ils) = forms;
-                                        }
+                                        (*je, *tu, *il, *nous, *vous, *ils) = VerbForms::gen_from_regular(changed);
                                     }
                                 }
                             }

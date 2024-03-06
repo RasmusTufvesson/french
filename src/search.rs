@@ -34,18 +34,44 @@ impl Display for VerbForms {
     }
 }
 
+enum RegularVerbType {
+    Er,
+    Re,
+    Ir,
+}
+
 impl VerbForms {
-    pub fn gen_from_regular(string: &str) -> Option<(String, String, String, String, String, String)> {
-        let base = if string.ends_with("e") {
-            &string[0..string.len()-1]
-        } else if string.ends_with("es") || string.ends_with("ez") {
-            &string[0..string.len()-2]
+    pub fn gen_from_regular(string: &str) -> (String, String, String, String, String, String) {
+        let (base, regular_verb_type) = if string.ends_with("issons") || string.ends_with("issent") {
+            (&string[0..string.len()-6], RegularVerbType::Ir)
+        } else if string.ends_with("issez") {
+            (&string[0..string.len()-5], RegularVerbType::Ir)
         } else if string.ends_with("ons") || string.ends_with("ent") {
-            &string[0..string.len()-3]
+            (&string[0..string.len()-3], RegularVerbType::Er)
+        } else if string.ends_with("es") || string.ends_with("ez") || string.ends_with("er") {
+            (&string[0..string.len()-2], RegularVerbType::Er)
+        } else if string.ends_with("is") || string.ends_with("it") || string.ends_with("ir") {
+            (&string[0..string.len()-2], RegularVerbType::Ir)
+        } else if string.ends_with("re") {
+            (&string[0..string.len()-2], RegularVerbType::Re)
+        } else if string.ends_with("e") {
+            (&string[0..string.len()-1], RegularVerbType::Er)
+        } else if string.ends_with("s") {
+            (&string[0..string.len()-1], RegularVerbType::Ir)
         } else {
-            return None;
+            (string, RegularVerbType::Re)
         };
-        Some((base.to_string()+"e", base.to_string()+"es", base.to_string()+"e", base.to_string()+"ons", base.to_string()+"ez", base.to_string()+"ent"))
+        match regular_verb_type {
+            RegularVerbType::Er => {
+                (base.to_string()+"e", base.to_string()+"es", base.to_string()+"e", base.to_string()+"ons", base.to_string()+"ez", base.to_string()+"ent")
+            }
+            RegularVerbType::Ir => {
+                (base.to_string()+"is", base.to_string()+"is", base.to_string()+"it", base.to_string()+"issons", base.to_string()+"issez", base.to_string()+"issent")
+            }
+            RegularVerbType::Re => {
+                (base.to_string()+"s", base.to_string()+"s", base.to_string(), base.to_string()+"ons", base.to_string()+"ez", base.to_string()+"ent")
+            }
+        }
     }
 }
 
