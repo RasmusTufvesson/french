@@ -1,5 +1,6 @@
 mod search;
 mod ui;
+mod practice;
 
 const WORDS_FILE: &str = "words.bin";
 const SENTENCES_FILE: &str = "sentences.bin";

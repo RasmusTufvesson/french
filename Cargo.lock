@@ -898,6 +898,7 @@ dependencies = [
  "bincode",
  "eframe",
  "levenshtein",
+ "rand",
  "serde",
 ]
 

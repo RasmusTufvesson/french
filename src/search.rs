@@ -2,6 +2,7 @@ use std::{fmt::Display, fs::File, io::{Write, Read}};
 use levenshtein::levenshtein;
 use serde::{Serialize, Deserialize};
 use bincode::{serialize, deserialize};
+use rand::{seq::SliceRandom, thread_rng, distributions::{Distribution, Standard}, Rng};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Gender {
@@ -161,6 +162,16 @@ pub enum Language {
     English,
 }
 
+impl Language {
+    pub fn to_str(&self) -> &str {
+        match self {
+            Self::French => "french",
+            Self::Swedish => "swedish",
+            Self::English => "english",
+        }
+    }
+}
+
 impl Display for Language {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
@@ -168,6 +179,15 @@ impl Display for Language {
             Self::Swedish => "Swedish",
             Self::English => "English",
         })
+    }
+}
+
+impl Distribution<Language> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Language {
+        match rng.gen_range(0..=1) {
+            0 => Language::French,
+            _ => Language::Swedish,
+        }
     }
 }
 
@@ -251,5 +271,9 @@ impl Search {
 
     pub fn remove_item(&mut self, item: usize) {
         self.items.remove(item);
+    }
+
+    pub fn random_item(&self) -> Item {
+        self.items.choose(&mut thread_rng()).unwrap().clone()
     }
 }
