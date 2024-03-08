@@ -3,3 +3,6 @@ This is a small program i made to have some fun and improve my french. You can s
 
 ## Todo
 * Add an explain tab where you can see what each word in a sentence means, also in a context menu from sentences
+* Add filter option to practice
+* Make words you know not appear multiple times in practice
+* Add adverbs, articles, conjunctions, prepositions, pronouns, and interjections

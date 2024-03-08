@@ -1,6 +1,7 @@
 use crate::search::{Category, Language, Search, VerbForms};
 use rand::{thread_rng, Rng};
 
+#[derive(PartialEq)]
 pub struct Question {
     pub string: String,
     pub answer: String,

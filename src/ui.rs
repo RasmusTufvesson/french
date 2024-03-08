@@ -2,18 +2,21 @@
 
 use eframe::{self, egui::{self, Layout}};
 use levenshtein::levenshtein;
-use crate::{practice::{get_practice_question, Question}, search::{Category, Gender, Item, Language, Query, Search, VerbForms}};
+use crate::{explain::{explain, Part}, practice::{get_practice_question, Question}, search::{Category, Gender, Item, Language, Query, Search, VerbForms}};
 
+#[derive(PartialEq)]
 enum PracticeState {
     Wrong(String, String, String, usize),
     Question(Question),
 }
 
+#[derive(PartialEq)]
 enum Tab {
     Words,
     Sentences,
     Verbs,
     Practice(PracticeState),
+    Explain,
 }
 
 #[derive(PartialEq)]
@@ -67,6 +70,7 @@ pub struct App {
     categories: SearchCategories,
     min_num_answers: usize,
     results_verbs: (Option<String>, Option<String>, String, VerbForms),
+    result_explain: Vec<Part>
 }
 
 impl App {
@@ -86,6 +90,7 @@ impl App {
             categories: SearchCategories::new(),
             min_num_answers: 0,
             results_verbs: (None, None, "".to_string(), VerbForms::Regular("".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string())),
+            result_explain: vec![],
         };
         app
     }
@@ -111,6 +116,9 @@ impl App {
                     }
                 }
             },
+            Tab::Explain => {
+                self.result_explain = explain(&self.query_string, &self.search_words);
+            }
             _ => {}
         }
     }
@@ -166,6 +174,15 @@ impl eframe::App for App {
                     self.tab = Tab::Practice(PracticeState::Question(get_practice_question(&self.search_words)));
                     self.query_string.clear();
                     self.popup = PopupWindow::None;
+                }
+                if ui.button("Explain").clicked() {
+                    self.tab = Tab::Explain;
+                    self.query_string.clear();
+                    self.popup = PopupWindow::None;
+                    self.result_explain.clear();
+                    if self.language == Language::French {
+                        self.language = Language::Swedish;
+                    }
                 }
                 ui.with_layout(egui::Layout::right_to_left(eframe::emath::Align::Center), |ui| {
                     match self.tab {
@@ -227,6 +244,20 @@ impl eframe::App for App {
                         }
                         Tab::Practice(_) => {
 
+                        }
+                        Tab::Explain => {
+                            egui::ComboBox::from_id_source("Language")
+                                .selected_text(format!("{}", self.language))
+                                .show_ui(ui, |ui| {
+                                    if ui.selectable_value(&mut self.language, Language::Swedish, "Swedish").clicked() |
+                                    ui.selectable_value(&mut self.language, Language::English, "English").clicked() {
+                                        self.result_explain.clear();
+                                        self.popup = PopupWindow::None;
+                                        self.gen_results();
+                                    }
+                                }
+                            );
+                            ui.separator();
                         }
                     }
                 });
@@ -329,6 +360,17 @@ impl eframe::App for App {
                                                 update_results = true;
                                             }
                                         }
+                                        if self.tab == Tab::Sentences {
+                                            if ui.button("Explain").clicked() {
+                                                ui.close_menu();
+                                                self.tab = Tab::Explain;
+                                                self.query_string = string.clone();
+                                                if self.language == Language::French {
+                                                    self.language = Language::Swedish;
+                                                }
+                                                update_results = true;
+                                            }
+                                        }
                                         if ui.button("Edit").clicked() {
                                             ui.close_menu();
                                             self.popup = PopupWindow::AddWord(match item.swedish.clone() {
@@ -400,6 +442,33 @@ impl eframe::App for App {
                                 }
                             }
                         }
+                    });
+                }
+                Tab::Explain => {
+                    ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
+                        ui.label(&self.query_string);
+                        ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
+                            for part in &self.result_explain {
+                                ui.label(&part.matched).on_hover_ui_at_pointer(|ui| {
+                                    ui.label(format!("({}) {}", &part.string, part.item.tooltip()));
+                                });
+                            }
+                        });
+                        ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
+                            if self.language == Language::Swedish {
+                                for part in &self.result_explain {
+                                    ui.label(&part.item.swedish.clone().unwrap()).on_hover_ui_at_pointer(|ui| {
+                                        ui.label(format!("({}) {}", &part.matched, part.item.tooltip()));
+                                    });
+                                }
+                            } else {
+                                for part in &self.result_explain {
+                                    ui.label(&part.item.english.clone().unwrap()).on_hover_ui_at_pointer(|ui| {
+                                        ui.label(format!("({}) {}", &part.matched, part.item.tooltip()));
+                                    });
+                                }
+                            }
+                        });
                     });
                 }
             }
