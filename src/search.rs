@@ -76,20 +76,61 @@ impl VerbForms {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Pronoun {
+    Personal(String, Option<(String, String, String)>),
+    Adverbial(String),
+    Demonstrative(String, String, String, String),
+    ImpersonalSubject(String),
+    IndefiniteDemonstrative(String),
+    Indefinite(String, Option<String>),
+    Interrogative(String),
+    Negative(String),
+    Possessive(String, String, String, String),
+    Relative(String, Option<(String, String, String)>),
+    IndefiniteRelative(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Category {
-    Noun(String, Gender),
+    Noun(String, Gender, String),
     Verb(String, VerbForms),
     Adjective(String, String, String),
-    All(String),
+    Article(String, String, String, Option<String>),
+    Conjunction(String),
+    Pronoun(Pronoun),
+    Preposition(String),
+    Adverb(String),
+    Interjection(String),
+    Other(String),
+}
+
+fn get_plural(string: &str) -> String {
+    if string.ends_with("al") || string.ends_with("au") {
+        string[0..string.len()-2].to_string() + "aux"
+    } else if string.ends_with("ail") {
+        string[0..string.len()-3].to_string() + "aux"
+    } else if string.ends_with("eu") || string.ends_with("ou") {
+        string.to_string() + "x"
+    } else if !string.ends_with("s") && !string.ends_with("x") && !string.ends_with("z") {
+        string.to_string() + "s"
+    } else {
+        string.to_string()
+    }
 }
 
 impl Category {
-    pub fn to_u8(&self) -> u8 {
+    pub fn to_u16(&self) -> u16 {
         match self {
-            Self::Noun(..) => 0b00000001,
-            Self::Verb(..) => 0b00000010,
-            Self::Adjective(..) => 0b00000100,
-            Self::All(_) => 0b11111111,
+            Self::Noun(..) => 0b1,
+            Self::Verb(..) => 0b10,
+            Self::Adjective(..) => 0b100,
+            Self::Adverb(_) => 0b1000,
+            Self::Article(..) => 0b10000,
+            Self::Conjunction(_) => 0b100000,
+            Self::Interjection(_) => 0b1000000,
+            Self::Preposition(_) => 0b10000000,
+            Self::Pronoun(..) => 0b100000000,
+            Self::Other(_) => 0b11111111,
         }
     }
 
@@ -103,11 +144,11 @@ impl Category {
             None => "unknown",
         };
         match self {
-            Self::All(string) => format!("{} ({}, {})", string, swedish, english),
-            Self::Noun(string, gender) => {
+            Self::Other(string) => format!("{} ({}, {})", string, swedish, english),
+            Self::Noun(string, gender, plural) => {
                 match gender {
-                    Gender::Male => format!("{} ({}, {}), masculine noun", string, swedish, english),
-                    Gender::Female => format!("{} ({}, {}), feminine noun", string, swedish, english),
+                    Gender::Male => format!("{}/{} ({}, {}), masculine noun", string, plural, swedish, english),
+                    Gender::Female => format!("{}/{} ({}, {}), feminine noun", string, plural, swedish, english),
                 }
             }
             Self::Verb(name, forms) => {
@@ -116,7 +157,47 @@ impl Category {
                     VerbForms::Regular(..) => format!("{} ({}, {}), regular verb", name, swedish, english),
                 }
             }
-            Self::Adjective(female, male, plural) => format!("{}/{}/{} ({}, {}), adjective", male, female, plural, swedish, english)
+            Self::Adjective(female, male, plural) => format!("{}/{}/{} ({}, {}), adjective", male, female, plural, swedish, english),
+            Self::Adverb(string) => format!("{} ({}, {}), adverb", string, swedish, english),
+            Self::Article(male, female, plural, vowel) => {
+                match vowel {
+                    Some(v) => format!("{}/{}/{}/{} ({}, {}), article", male, female, plural, v, swedish, english),
+                    None => format!("{}/{}/{} ({}, {}), article", male, female, plural, swedish, english),
+                }
+            }
+            Self::Conjunction(string) => format!("{} ({}, {}), conjunction", string, swedish, english),
+            Self::Interjection(string) => format!("{} ({}, {}), interjection", string, swedish, english),
+            Self::Preposition(string) => format!("{} ({}, {}), preposition", string, swedish, english),
+            Self::Pronoun(pronoun_type) => {
+                match pronoun_type {
+                    Pronoun::Personal(subject, others) => {
+                        match others {
+                            Some((direct_object, indirect_object, reflexive)) => format!("{}/{}/{}/{} ({}, {}), personal pronoun", subject, direct_object, indirect_object, reflexive, swedish, english),
+                            None => format!("{} ({}, {}), personal pronoun", subject, swedish, english),
+                        }
+                    }
+                    Pronoun::Adverbial(string) => format!("{} ({}, {}), adverbial pronoun", string, swedish, english),
+                    Pronoun::Demonstrative(s_m, s_f, p_m, p_f) => format!("{}/{}/{}/{} ({}, {}), demonstrative pronoun", s_m, s_f, p_m, p_f, swedish, english),
+                    Pronoun::ImpersonalSubject(string) => format!("{} ({}, {}), impersonal subject", string, swedish, english),
+                    Pronoun::Indefinite(male, female) => {
+                        match female {
+                            Some(female) => format!("{}/{} ({}, {}), indefinite pronoun", male, female, swedish, english),
+                            None => format!("{} ({}, {}), indefinite pronoun", male, swedish, english),
+                        }
+                    }
+                    Pronoun::IndefiniteDemonstrative(string) => format!("{} ({}, {}), indefinite demonstrative pronoun", string, swedish, english),
+                    Pronoun::IndefiniteRelative(string) => format!("{} ({}, {}), indefinite relative pronoun", string, swedish, english),
+                    Pronoun::Interrogative(string) => format!("{} ({}, {}), interrogative pronoun", string, swedish, english),
+                    Pronoun::Negative(string) => format!("ne ... {} ({}, {}), negative pronoun", string, swedish, english),
+                    Pronoun::Possessive(s_m, s_f, p_m, p_f) => format!("{}/{}/{}/{} ({}, {}), possesive pronoun", s_m, s_f, p_m, p_f, swedish, english),
+                    Pronoun::Relative(string, others) => {
+                        match others {
+                            None => format!("{} ({}, {}), relative pronoun", string, swedish, english),
+                            Some((s_f, p_m, p_f)) => format!("{}/{}/{}/{} ({}, {}), relative pronoun", string, s_f, p_m, p_f, swedish, english),
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -124,10 +205,16 @@ impl Category {
 impl Display for Category {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            Self::All(_) => "Other",
+            Self::Other(_) => "Other",
             Self::Noun(..) => "Noun",
             Self::Verb(..) => "Verb",
             Self::Adjective(..) => "Adjective",
+            Self::Adverb(_) => "Adverb",
+            Self::Article(..) => "Article",
+            Self::Conjunction(_) => "Conjunction",
+            Self::Interjection(_) => "Interjection",
+            Self::Preposition(_) => "Preposition",
+            Self::Pronoun(..) => "Pronoun"
         })
     }
 }
@@ -137,12 +224,12 @@ pub struct Item {
     pub swedish: Option<String>,
     pub english: Option<String>,
     pub category: Category,
-    category_int: u8,
+    category_int: u16,
 }
 
 impl Item {
     pub fn new(swedish: Option<String>, english: Option<String>, category: Category) -> Self {
-        let category_int = category.to_u8();
+        let category_int = category.to_u16();
         Self { swedish, english, category, category_int }
     }
 
@@ -150,13 +237,53 @@ impl Item {
         match language {
             Language::French => {
                 match &self.category {
-                    Category::All(string) => Some(vec![string.to_owned()]),
+                    Category::Other(string) => Some(vec![string.to_owned()]),
                     Category::Adjective(female, male, plural) => Some(vec![female.to_owned(), male.to_owned(), plural.to_owned()]),
-                    Category::Noun(string, _) => Some(vec![string.to_owned()]),
+                    Category::Noun(string, _, plural) => Some(vec![string.to_owned(), plural.to_owned()]),
                     Category::Verb(base, form) => {
                         match form {
                             VerbForms::Regular(je, tu, _, nous, vous, ils) => Some(vec![je.to_owned(), tu.to_owned(), nous.to_owned(), vous.to_owned(), ils.to_owned(), base.to_owned()]),
                             VerbForms::Irregular(je, tu, il, nous, vous, ils) => Some(vec![je.to_owned(), tu.to_owned(), il.to_owned(), nous.to_owned(), vous.to_owned(), ils.to_owned(), base.to_owned()]),
+                        }
+                    }
+                    Category::Adverb(string) => Some(vec![string.to_owned()]),
+                    Category::Article(male, female, plural, vowel) => {
+                        match vowel {
+                            Some(vowel) => Some(vec![male.to_owned(), female.to_owned(), plural.to_owned(), vowel.to_owned()]),
+                            None => Some(vec![male.to_owned(), female.to_owned(), plural.to_owned()]),
+                        }
+                    }
+                    Category::Conjunction(string) => Some(vec![string.to_owned()]),
+                    Category::Interjection(string) => Some(vec![string.to_owned()]),
+                    Category::Preposition(string) => Some(vec![string.to_owned()]),
+                    Category::Pronoun(pronoun) => {
+                        match pronoun {
+                            Pronoun::Adverbial(string) => Some(vec![string.to_owned()]),
+                            Pronoun::ImpersonalSubject(string) => Some(vec![string.to_owned()]),
+                            Pronoun::IndefiniteDemonstrative(string) => Some(vec![string.to_owned()]),
+                            Pronoun::IndefiniteRelative(string) => Some(vec![string.to_owned()]),
+                            Pronoun::Interrogative(string) => Some(vec![string.to_owned()]),
+                            Pronoun::Negative(string) => Some(vec![string.to_owned()]),
+                            Pronoun::Demonstrative(s_m, s_f, p_m, p_f) => Some(vec![s_m.to_owned(), s_f.to_owned(), p_m.to_owned(), p_f.to_owned()]),
+                            Pronoun::Indefinite(male, female) => {
+                                match female {
+                                    Some(female) => Some(vec![male.to_owned(), female.to_owned()]),
+                                    None => Some(vec![male.to_owned()]),
+                                }
+                            }
+                            Pronoun::Personal(subject, others) => {
+                                match others {
+                                    Some((direct_object, indirect_object, reflexive)) => Some(vec![subject.to_owned(), direct_object.to_owned(), indirect_object.to_owned(), reflexive.to_owned()]),
+                                    None => Some(vec![subject.to_owned()])
+                                }
+                            }
+                            Pronoun::Possessive(s_m, s_f, p_m, p_f) => Some(vec![s_m.to_owned(), s_f.to_owned(), p_m.to_owned(), p_f.to_owned()]),
+                            Pronoun::Relative(string, others) => {
+                                match others {
+                                    Some((s_f, p_m, p_f)) => Some(vec![string.to_owned(), s_f.to_owned(), p_m.to_owned(), p_f.to_owned()]),
+                                    None => Some(vec![string.to_owned()]),
+                                }
+                            }
                         }
                     }
                 }
@@ -220,11 +347,11 @@ impl Distribution<Language> for Standard {
 pub struct Query<'a> {
     string: &'a String,
     language: &'a Language,
-    search_categories_int: u8,
+    search_categories_int: u16,
 }
 
 impl<'a> Query<'a> {
-    pub fn new(string: &'a String, language: &'a Language, search_categories_int: u8) -> Self {
+    pub fn new(string: &'a String, language: &'a Language, search_categories_int: u16) -> Self {
         Self { string, language, search_categories_int }
     }
 }

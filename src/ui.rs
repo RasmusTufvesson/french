@@ -33,16 +33,16 @@ struct SearchCategories {
 }
 
 impl SearchCategories {
-    fn to_u8(&self) -> u8 {
+    fn to_u16(&self) -> u16 {
         let mut int = 0;
         if self.noun {
-            int += 0b00000001;
+            int += 0b1;
         }
         if self.verb {
-            int += 0b00000010;
+            int += 0b10;
         }
         if self.adjective {
-            int += 0b00000100;
+            int += 0b100;
         }
         if int == 0 {
             int = 0b11111111;
@@ -105,7 +105,7 @@ impl App {
                 self.results_sentences = self.search_sentences.search(&self.gen_query(), self.num_answers);
             }
             Tab::Verbs => {
-                let results = self.search_words.search(&Query::new(&self.query_string, &self.language, 0b00000010), 1);
+                let results = self.search_words.search(&Query::new(&self.query_string, &self.language, 0b10), 1);
                 if results.len() != 0 {
                     let result = &results[0].1;
                     match &result.category {
@@ -124,7 +124,7 @@ impl App {
     }
 
     fn gen_query(&self) -> Query {
-        Query::new(&self.query_string, &self.language, self.categories.to_u8())
+        Query::new(&self.query_string, &self.language, self.categories.to_u16())
     }
 
     fn on_enter(&mut self) {
@@ -188,7 +188,7 @@ impl eframe::App for App {
                     match self.tab {
                         Tab::Words => {
                             if ui.button("Add word").clicked() {
-                                self.popup = PopupWindow::AddWord("".to_string(), "".to_string(), Category::All("".to_string()), "".to_string(), None);
+                                self.popup = PopupWindow::AddWord("".to_string(), "".to_string(), Category::Other("".to_string()), "".to_string(), None);
                             }
                             ui.separator();
                             egui::ComboBox::from_id_source("Language")
@@ -407,7 +407,7 @@ impl eframe::App for App {
                                         if ui.button("Edit").clicked() {
                                             ui.close_menu();
                                             self.popup = PopupWindow::AddSentence(match &item.category {
-                                                Category::All(string) => string.clone(),
+                                                Category::Other(string) => string.clone(),
                                                 _ => "".to_string(),
                                             }, match item.swedish.clone() {
                                                 None => "".to_string(),
@@ -545,10 +545,10 @@ impl eframe::App for App {
                     egui::ComboBox::from_label("Category")
                         .selected_text(format!("{}", category))
                         .show_ui(ui, |ui| {
-                            ui.selectable_value(category, Category::Noun("".to_string(), Gender::Male), "Noun");
+                            ui.selectable_value(category, Category::Noun("".to_string(), Gender::Male, "".to_string()), "Noun");
                             ui.selectable_value(category, Category::Verb("".to_string(), VerbForms::Regular("".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string())), "Verb");
                             ui.selectable_value(category, Category::Adjective("".to_string(), "".to_string(), "".to_string()), "Adjective");
-                            ui.selectable_value(category, Category::All("".to_string()), "Other");
+                            ui.selectable_value(category, Category::Other("".to_string()), "Other");
                         }
                     );
                     ui.horizontal(|ui| {
@@ -560,10 +560,14 @@ impl eframe::App for App {
                         ui.label("English");
                     });
                     match category {
-                        Category::Noun(string, gender) => {
+                        Category::Noun(string, gender, plural) => {
                             ui.horizontal(|ui| {
                                 ui.add(egui::TextEdit::singleline(string));
-                                ui.label("French");
+                                ui.label("French Singular");
+                            });
+                            ui.horizontal(|ui| {
+                                ui.add(egui::TextEdit::singleline(plural));
+                                ui.label("French Plural");
                             });
                             egui::ComboBox::from_label("Gender")
                                 .selected_text(format!("{}", gender))
@@ -676,12 +680,13 @@ impl eframe::App for App {
                                 ui.label("Plural");
                             });
                         }
-                        Category::All(string) => {
+                        Category::Other(string) => {
                             ui.horizontal(|ui| {
                                 ui.add(egui::TextEdit::singleline(string));
                                 ui.label("French");
                             });
                         }
+                        _ => unimplemented!()
                     }
                     ui.horizontal(|ui| {
                         match edit {
@@ -734,7 +739,7 @@ impl eframe::App for App {
                                     close = true;
                                     let swedish_val = if swedish.len() > 0 { Some(swedish.clone()) } else { None };
                                     let english_val = if english.len() > 0 { Some(english.clone()) } else { None };
-                                    self.search_sentences.add_item(Item::new(swedish_val, english_val, Category::All(french.clone())));
+                                    self.search_sentences.add_item(Item::new(swedish_val, english_val, Category::Other(french.clone())));
                                     self.search_sentences.save(&self.search_sentences_file);
                                     reload = true;
                                 }
@@ -745,7 +750,7 @@ impl eframe::App for App {
                                     let swedish_val = if swedish.len() > 0 { Some(swedish.clone()) } else { None };
                                     let english_val = if english.len() > 0 { Some(english.clone()) } else { None };
                                     self.search_sentences.remove_item(*index);
-                                    self.search_sentences.add_item(Item::new(swedish_val, english_val, Category::All(french.clone())));
+                                    self.search_sentences.add_item(Item::new(swedish_val, english_val, Category::Other(french.clone())));
                                     self.search_sentences.save(&self.search_sentences_file);
                                     reload = true;
                                 }

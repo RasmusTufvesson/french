@@ -38,14 +38,18 @@ pub fn get_practice_question(search: &Search) -> Question {
     let item = search.random_item();
     let to_language = thread_rng().gen::<Language>();
     match item.category {
-        Category::All(s) => {
+        Category::Other(s) => {
             Question::translate(s, item.swedish.unwrap(), to_language)
         }
         Category::Adjective(_, s, _) => {
             Question::translate_adjective(s, item.swedish.unwrap(), to_language)
         }
-        Category::Noun(s, _) => {
-            Question::translate(s, item.swedish.unwrap(), to_language)
+        Category::Noun(s, _, plural) => {
+            match thread_rng().gen_range(0..=1) {
+                0 => Question::translate(s, item.swedish.unwrap(), to_language),
+                _ => Question::translate(plural, item.swedish.unwrap(), to_language),
+            }
+            
         }
         Category::Verb(_, forms) => {
             let (VerbForms::Regular(je, tu, il, nous, vous, ils) | VerbForms::Irregular(je, tu, il, nous, vous, ils)) = forms;
@@ -58,5 +62,6 @@ pub fn get_practice_question(search: &Search) -> Question {
                 _ => Question::translate_verb(ils, item.swedish.unwrap(), "ils/elles", to_language),
             }
         }
+        _ => unimplemented!()
     }
 }
