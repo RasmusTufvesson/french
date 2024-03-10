@@ -24,6 +24,8 @@ enum PopupWindow {
     None,
     AddWord(String, String, Category, String, Option<usize>),
     AddSentence(String, String, String, Option<usize>),
+    DeleteWord(usize),
+    DeleteSentence(usize),
 }
 
 struct SearchCategories {
@@ -360,17 +362,6 @@ impl eframe::App for App {
                                                 update_results = true;
                                             }
                                         }
-                                        if self.tab == Tab::Sentences {
-                                            if ui.button("Explain").clicked() {
-                                                ui.close_menu();
-                                                self.tab = Tab::Explain;
-                                                self.query_string = string.clone();
-                                                if self.language == Language::French {
-                                                    self.language = Language::Swedish;
-                                                }
-                                                update_results = true;
-                                            }
-                                        }
                                         if ui.button("Edit").clicked() {
                                             ui.close_menu();
                                             self.popup = PopupWindow::AddWord(match item.swedish.clone() {
@@ -380,6 +371,10 @@ impl eframe::App for App {
                                                 None => "".to_string(),
                                                 Some(val) => val,
                                             }, item.category.clone(), "".to_string(), Some(self.search_words.get_item_index(item)));
+                                        }
+                                        if ui.button("Delete").clicked() {
+                                            ui.close_menu();
+                                            self.popup = PopupWindow::DeleteWord(self.search_words.get_item_index(item));
                                         }
                                     });
                                 }
@@ -395,6 +390,7 @@ impl eframe::App for App {
                                         self.gen_results();
                                     }
                                 }
+                                let mut update_results = false;
                                 for (i, (string, item)) in self.results_sentences.iter().enumerate() {
                                     if i >= self.min_num_answers {
                                         break;
@@ -404,6 +400,15 @@ impl eframe::App for App {
                                         ui.label(format!("{}", item.tooltip()));
                                     });
                                     response.context_menu(|ui| {
+                                        if ui.button("Explain").clicked() {
+                                            ui.close_menu();
+                                            self.tab = Tab::Explain;
+                                            self.query_string = string.clone();
+                                            if self.language == Language::French {
+                                                self.language = Language::Swedish;
+                                            }
+                                            update_results = true;
+                                        }
                                         if ui.button("Edit").clicked() {
                                             ui.close_menu();
                                             self.popup = PopupWindow::AddSentence(match &item.category {
@@ -417,7 +422,14 @@ impl eframe::App for App {
                                                 Some(val) => val,
                                             }, Some(self.search_sentences.get_item_index(item)));
                                         }
+                                        if ui.button("Delete").clicked() {
+                                            ui.close_menu();
+                                            self.popup = PopupWindow::DeleteSentence(self.search_sentences.get_item_index(item));
+                                        }
                                     });
+                                }
+                                if update_results {
+                                    self.gen_results();
                                 }
                             }
                             _ => {}
@@ -928,6 +940,38 @@ impl eframe::App for App {
                                     reload = true;
                                 }
                             }
+                        }
+                        if ui.button("Cancel").clicked() {
+                            close = true;
+                        }
+                    });
+                });
+            }
+            PopupWindow::DeleteWord(index) => {
+                egui::Window::new("Delete word").collapsible(false).show(ctx, |ui| {
+                    ui.label("Are you sure?");
+                    ui.horizontal(|ui| {
+                        if ui.button("Delete").clicked() {
+                            close = true;
+                            self.search_words.remove_item(*index);
+                            self.search_words.save(&self.search_words_file);
+                            reload = true;
+                        }
+                        if ui.button("Cancel").clicked() {
+                            close = true;
+                        }
+                    });
+                });
+            }
+            PopupWindow::DeleteSentence(index) => {
+                egui::Window::new("Delete sentence").collapsible(false).show(ctx, |ui| {
+                    ui.label("Are you sure?");
+                    ui.horizontal(|ui| {
+                        if ui.button("Delete").clicked() {
+                            close = true;
+                            self.search_sentences.remove_item(*index);
+                            self.search_sentences.save(&self.search_sentences_file);
+                            reload = true;
                         }
                         if ui.button("Cancel").clicked() {
                             close = true;
