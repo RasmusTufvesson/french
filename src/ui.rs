@@ -2,7 +2,7 @@
 
 use eframe::{self, egui::{self, Layout}};
 use levenshtein::levenshtein;
-use crate::{explain::{explain, Part}, practice::{get_practice_question, Question}, search::{Category, Gender, Item, Language, Query, Search, VerbForms}};
+use crate::{explain::{explain, Part}, practice::{get_practice_question, Question}, search::{Category, Gender, Item, Language, Pronoun, Query, Search, VerbForms}};
 
 #[derive(PartialEq)]
 enum PracticeState {
@@ -45,7 +45,7 @@ impl SearchCategories {
             int += 0b100;
         }
         if int == 0 {
-            int = 0b11111111;
+            int = 0b1111111111111111;
         }
         int
     }
@@ -548,6 +548,12 @@ impl eframe::App for App {
                             ui.selectable_value(category, Category::Noun("".to_string(), Gender::Male, "".to_string()), "Noun");
                             ui.selectable_value(category, Category::Verb("".to_string(), VerbForms::Regular("".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string())), "Verb");
                             ui.selectable_value(category, Category::Adjective("".to_string(), "".to_string(), "".to_string()), "Adjective");
+                            ui.selectable_value(category, Category::Adverb("".to_string()), "Adverb");
+                            ui.selectable_value(category, Category::Article("".to_string(), "".to_string(), "".to_string(), Some("".to_string())), "Article");
+                            ui.selectable_value(category, Category::Conjunction("".to_string()), "Conjunction");
+                            ui.selectable_value(category, Category::Interjection("".to_string()), "Interjection");
+                            ui.selectable_value(category, Category::Preposition("".to_string()), "Preposition");
+                            ui.selectable_value(category, Category::Pronoun(Pronoun::Personal("".to_string(), "".to_string(), "".to_string(), Some(("".to_string(), "".to_string())))), "Pronoun");
                             ui.selectable_value(category, Category::Other("".to_string()), "Other");
                         }
                     );
@@ -680,13 +686,180 @@ impl eframe::App for App {
                                 ui.label("Plural");
                             });
                         }
-                        Category::Other(string) => {
+                        Category::Other(string) | Category::Adverb(string) | Category::Conjunction(string) | Category::Interjection(string) | Category::Preposition(string) => {
                             ui.horizontal(|ui| {
                                 ui.add(egui::TextEdit::singleline(string));
                                 ui.label("French");
                             });
                         }
-                        _ => unimplemented!()
+                        Category::Article(male, female, plural, vowel) => {
+                            ui.horizontal(|ui| {
+                                ui.add(egui::TextEdit::singleline(male));
+                                ui.label("Male");
+                            });
+                            ui.horizontal(|ui| {
+                                ui.add(egui::TextEdit::singleline(female));
+                                ui.label("Female");
+                            });
+                            ui.horizontal(|ui| {
+                                ui.add(egui::TextEdit::singleline(plural));
+                                ui.label("Plural");
+                            });
+                            let mut elision = if let Some(_) = vowel {
+                                true
+                            } else { false };
+                            if ui.checkbox(&mut elision, "Elision").changed() {
+                                if elision {
+                                    *vowel = Some("".to_string());
+                                } else {
+                                    *vowel = None;
+                                }
+                            }
+                            if let Some(string) = vowel {
+                                ui.horizontal(|ui| {
+                                    ui.add(egui::TextEdit::singleline(string));
+                                    ui.label("Elision");
+                                });
+                            }
+                        }
+                        Category::Pronoun(pronoun) => {
+                            egui::ComboBox::from_label("Type of pronoun")
+                                .selected_text(format!("{}", pronoun))
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(pronoun, Pronoun::Personal("".to_string(), "".to_string(), "".to_string(), Some(("".to_string(), "".to_string()))), "Personal");
+                                    ui.selectable_value(pronoun, Pronoun::Adverbial("".to_string()), "Adverbial");
+                                    ui.selectable_value(pronoun, Pronoun::ImpersonalSubject("".to_string()), "Impersonal subject");
+                                    ui.selectable_value(pronoun, Pronoun::IndefiniteDemonstrative("".to_string()), "Indefinite demonstrative");
+                                    ui.selectable_value(pronoun, Pronoun::IndefiniteRelative("".to_string()), "Indefinite relative");
+                                    ui.selectable_value(pronoun, Pronoun::Interrogative("".to_string()), "Interrogative");
+                                    ui.selectable_value(pronoun, Pronoun::Negative("".to_string()), "Negative");
+                                    ui.selectable_value(pronoun, Pronoun::Demonstrative("".to_string(), "".to_string(), "".to_string(), "".to_string()), "Demonstrative");
+                                    ui.selectable_value(pronoun, Pronoun::Possessive("".to_string(), "".to_string(), "".to_string(), "".to_string()), "Possesive");
+                                    ui.selectable_value(pronoun, Pronoun::Indefinite("".to_string(), Some("".to_string())), "Indefinite");
+                                    ui.selectable_value(pronoun, Pronoun::Relative("".to_string(), None), "Relative");
+                                }
+                            );
+                            match pronoun {
+                                Pronoun::Adverbial(string) | Pronoun::ImpersonalSubject(string) | Pronoun::IndefiniteDemonstrative(string) | Pronoun::IndefiniteRelative(string) | Pronoun::Interrogative(string) | Pronoun::Negative(string) => {
+                                    ui.horizontal(|ui| {
+                                        ui.add(egui::TextEdit::singleline(string));
+                                        ui.label("French");
+                                    });
+                                }
+                                Pronoun::Demonstrative(s_m, s_f, p_m, p_f) | Pronoun::Possessive(s_m, s_f, p_m, p_f) => {
+                                    ui.horizontal(|ui| {
+                                        ui.add(egui::TextEdit::singleline(s_m));
+                                        ui.label("Singular male");
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.add(egui::TextEdit::singleline(s_f));
+                                        ui.label("Singular female");
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.add(egui::TextEdit::singleline(p_m));
+                                        ui.label("Plural male");
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.add(egui::TextEdit::singleline(p_f));
+                                        ui.label("Plural female");
+                                    });
+                                }
+                                Pronoun::Indefinite(male, female) => {
+                                    ui.horizontal(|ui| {
+                                        ui.add(egui::TextEdit::singleline(male));
+                                        ui.label("Male");
+                                    });
+                                    if let Some(female) = female {
+                                        ui.horizontal(|ui| {
+                                            ui.add(egui::TextEdit::singleline(female));
+                                            ui.label("Female");
+                                        });
+                                    }
+                                }
+                                Pronoun::Personal(subject, reflexive, stressed, others) => {
+                                    let mut do_and_io = if let Some(_) = others {
+                                        true
+                                    } else { false };
+                                    if ui.checkbox(&mut do_and_io, "Direct object and indirect object").changed() {
+                                        if do_and_io {
+                                            *others = Some(("".to_string(), "".to_string()));
+                                        } else {
+                                            *others = None;
+                                        }
+                                    }
+                                    if let Some((direct_object, indirect_object)) = others {
+                                        ui.horizontal(|ui| {
+                                            ui.add(egui::TextEdit::singleline(subject));
+                                            ui.label("Subject");
+                                        });
+                                        ui.horizontal(|ui| {
+                                            ui.add(egui::TextEdit::singleline(direct_object));
+                                            ui.label("Direct object");
+                                        });
+                                        ui.horizontal(|ui| {
+                                            ui.add(egui::TextEdit::singleline(indirect_object));
+                                            ui.label("Indirect object");
+                                        });
+                                        ui.horizontal(|ui| {
+                                            ui.add(egui::TextEdit::singleline(reflexive));
+                                            ui.label("Reflexive");
+                                        });
+                                        ui.horizontal(|ui| {
+                                            ui.add(egui::TextEdit::singleline(stressed));
+                                            ui.label("Stressed");
+                                        });
+                                    } else {
+                                        ui.horizontal(|ui| {
+                                            ui.add(egui::TextEdit::singleline(subject));
+                                            ui.label("Subject");
+                                        });
+                                        ui.horizontal(|ui| {
+                                            ui.add(egui::TextEdit::singleline(reflexive));
+                                            ui.label("Reflexive");
+                                        });
+                                        ui.horizontal(|ui| {
+                                            ui.add(egui::TextEdit::singleline(stressed));
+                                            ui.label("Stressed");
+                                        });
+                                    }
+                                }
+                                Pronoun::Relative(string, others) => {
+                                    let mut bendable = if let Some(_) = others {
+                                        true
+                                    } else { false };
+                                    if ui.checkbox(&mut bendable, "Bendable").changed() {
+                                        if bendable {
+                                            *others = Some(("".to_string(), "".to_string(), "".to_string()));
+                                        } else {
+                                            *others = None;
+                                        }
+                                    }
+                                    if let Some((s_f, p_m, p_f)) = others {
+                                        ui.horizontal(|ui| {
+                                            ui.add(egui::TextEdit::singleline(string));
+                                            ui.label("Singular male");
+                                        });
+                                        ui.horizontal(|ui| {
+                                            ui.add(egui::TextEdit::singleline(s_f));
+                                            ui.label("Singular female");
+                                        });
+                                        ui.horizontal(|ui| {
+                                            ui.add(egui::TextEdit::singleline(p_m));
+                                            ui.label("Plural male");
+                                        });
+                                        ui.horizontal(|ui| {
+                                            ui.add(egui::TextEdit::singleline(p_f));
+                                            ui.label("Plural female");
+                                        });
+                                    } else {
+                                        ui.horizontal(|ui| {
+                                            ui.add(egui::TextEdit::singleline(string));
+                                            ui.label("French");
+                                        });
+                                    }
+                                }
+                            }
+                        }
                     }
                     ui.horizontal(|ui| {
                         match edit {

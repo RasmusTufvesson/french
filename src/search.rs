@@ -77,7 +77,7 @@ impl VerbForms {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Pronoun {
-    Personal(String, Option<(String, String, String)>),
+    Personal(String, String, String, Option<(String, String)>),
     Adverbial(String),
     Demonstrative(String, String, String, String),
     ImpersonalSubject(String),
@@ -88,6 +88,24 @@ pub enum Pronoun {
     Possessive(String, String, String, String),
     Relative(String, Option<(String, String, String)>),
     IndefiniteRelative(String),
+}
+
+impl Display for Pronoun {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Self::Adverbial(_) => "Adverbial",
+            Self::Demonstrative(..) => "Demonstrative",
+            Self::ImpersonalSubject(_) => "Impersonal subject",
+            Self::Indefinite(..) => "Indefinite",
+            Self::IndefiniteDemonstrative(_) => "Indefinite demonstrative",
+            Self::IndefiniteRelative(_) => "Indefinite relative",
+            Self::Interrogative(_) => "Interrogative",
+            Self::Negative(_) => "Negative",
+            Self::Personal(..) => "Personal",
+            Self::Possessive(..) => "Possessive",
+            Self::Relative(..) => "Relative",
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -170,10 +188,10 @@ impl Category {
             Self::Preposition(string) => format!("{} ({}, {}), preposition", string, swedish, english),
             Self::Pronoun(pronoun_type) => {
                 match pronoun_type {
-                    Pronoun::Personal(subject, others) => {
+                    Pronoun::Personal(subject, reflexive, stressed, others) => {
                         match others {
-                            Some((direct_object, indirect_object, reflexive)) => format!("{}/{}/{}/{} ({}, {}), personal pronoun", subject, direct_object, indirect_object, reflexive, swedish, english),
-                            None => format!("{} ({}, {}), personal pronoun", subject, swedish, english),
+                            Some((direct_object, indirect_object)) => format!("{}/{}/{}/{}/{} ({}, {}), personal pronoun", subject, direct_object, indirect_object, reflexive, stressed, swedish, english),
+                            None => format!("{}/{}/{} ({}, {}), personal pronoun", subject, reflexive, stressed, swedish, english),
                         }
                     }
                     Pronoun::Adverbial(string) => format!("{} ({}, {}), adverbial pronoun", string, swedish, english),
@@ -271,10 +289,10 @@ impl Item {
                                     None => Some(vec![male.to_owned()]),
                                 }
                             }
-                            Pronoun::Personal(subject, others) => {
+                            Pronoun::Personal(subject, reflexive, stressed, others) => {
                                 match others {
-                                    Some((direct_object, indirect_object, reflexive)) => Some(vec![subject.to_owned(), direct_object.to_owned(), indirect_object.to_owned(), reflexive.to_owned()]),
-                                    None => Some(vec![subject.to_owned()])
+                                    Some((direct_object, indirect_object)) => Some(vec![subject.to_owned(), direct_object.to_owned(), indirect_object.to_owned(), reflexive.to_owned(), stressed.to_owned()]),
+                                    None => Some(vec![subject.to_owned(), reflexive.to_owned(), stressed.to_owned()])
                                 }
                             }
                             Pronoun::Possessive(s_m, s_f, p_m, p_f) => Some(vec![s_m.to_owned(), s_f.to_owned(), p_m.to_owned(), p_f.to_owned()]),
