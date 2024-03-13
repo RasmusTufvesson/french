@@ -5,4 +5,5 @@ This is a small program i made to have some fun and improve my french. You can s
 * Add filter option to practice
 * Make words you know not appear multiple times in practice
 * Make practice work with the new word classes
-* Replace verbs tab with details tab that works with all words
+* Replace verbs tab with details tab that works with all words, make it impossible to access without a context menu as well
+* Add details context menu for words in explain, practice, and words tab
