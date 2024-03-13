@@ -548,6 +548,33 @@ impl Search {
         best_matches.iter().map(|(s, x)| (s.to_owned().to_owned(), x.to_owned())).collect()
     }
 
+    pub fn search_best_answers(&self, query: &Query) -> (Vec<(String, Item)>, usize) {
+        let mut best_matches: Vec<(&String, Item)> = vec![];
+        let mut best_match_score: usize = usize::MAX;
+
+        for item in &self.items {
+            if let Some(strings) = item.language_strings(&query.language) {
+                if item.category_int & query.search_categories_int != 0 {
+                    for string in strings {
+                        let list_item = (string, item.clone());
+                        if !best_matches.contains(&list_item) {
+                            let distance = levenshtein(&query.string, &list_item.0);
+                            if distance < best_match_score {
+                                best_match_score = distance;
+                                best_matches.clear();
+                                best_matches.push(list_item.to_owned());
+                            } else if distance == best_match_score {
+                                best_matches.push(list_item.to_owned());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        (best_matches.iter().map(|(s, x)| (s.to_owned().to_owned(), x.to_owned())).collect(), best_match_score)
+    }
+
     pub fn add_item(&mut self, item: Item) {
         self.items.push(item);
     }

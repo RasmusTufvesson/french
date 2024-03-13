@@ -500,23 +500,51 @@ impl eframe::App for App {
                     ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
                         ui.label(&self.query_string);
                         ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
-                            for part in &self.result_explain {
-                                ui.label(&part.matched).on_hover_ui_at_pointer(|ui| {
-                                    ui.label(format!("({}) {}", &part.string, part.item.tooltip()));
-                                });
+                            for part in &mut self.result_explain {
+                                if part.matched.len() == 1 {
+                                    let response = if part.sure {
+                                        ui.label(&part.matched[part.chosen].0)
+                                    } else {
+                                        ui.label(&format!("{}?", part.matched[part.chosen].0))
+                                    };
+                                    response.on_hover_ui_at_pointer(|ui| {
+                                        ui.label(format!("({}) {}", &part.string, part.matched[part.chosen].1.tooltip()));
+                                    });
+                                } else {
+                                    for (i, matched) in part.matched.iter().enumerate() {
+                                        let response = if part.sure {
+                                            ui.selectable_value(&mut part.chosen, i, &matched.0)
+                                        } else {
+                                            ui.selectable_value(&mut part.chosen, i, &format!("{}?", matched.0))
+                                        };
+                                        response.on_hover_ui_at_pointer(|ui| {
+                                            ui.label(format!("({}) {}", &part.string, matched.1.tooltip()));
+                                        });
+                                    }
+                                }
                             }
                         });
                         ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
                             if self.language == Language::Swedish {
                                 for part in &self.result_explain {
-                                    ui.label(&part.item.swedish.clone().unwrap()).on_hover_ui_at_pointer(|ui| {
-                                        ui.label(format!("({}) {}", &part.matched, part.item.tooltip()));
+                                    let response = if part.sure {
+                                        ui.label(&part.matched[part.chosen].1.swedish.clone().unwrap())
+                                    } else {
+                                        ui.label(&format!("{}?", part.matched[part.chosen].1.swedish.clone().unwrap()))
+                                    };
+                                    response.on_hover_ui_at_pointer(|ui| {
+                                        ui.label(format!("({}) {}", &part.matched[part.chosen].0, part.matched[part.chosen].1.tooltip()));
                                     });
                                 }
                             } else {
                                 for part in &self.result_explain {
-                                    ui.label(&part.item.english.clone().unwrap()).on_hover_ui_at_pointer(|ui| {
-                                        ui.label(format!("({}) {}", &part.matched, part.item.tooltip()));
+                                    let response = if part.sure {
+                                        ui.label(&part.matched[part.chosen].1.english.clone().unwrap())
+                                    } else {
+                                        ui.label(&format!("{}?", part.matched[part.chosen].1.english.clone().unwrap()))
+                                    };
+                                    response.on_hover_ui_at_pointer(|ui| {
+                                        ui.label(format!("({}) {}", &part.matched[part.chosen].0, part.matched[part.chosen].1.tooltip()));
                                     });
                                 }
                             }
