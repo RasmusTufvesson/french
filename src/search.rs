@@ -109,32 +109,61 @@ impl Display for Pronoun {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Adjective {
+    Demonstrative(String, String),
+    ExclamativeInterrogative(String, String, String, String),
+    Indefinite(String, String, String, String),
+    Negative(String, String),
+    Possessive(String, String, String),
+    Relative(String, String, String, String),
+    Past(String, String, String, String),
+    Present(String, String, String, String),
+}
+
+impl Display for Adjective {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Self::Demonstrative(..) => "Demonstrative",
+            Self::ExclamativeInterrogative(..) => "Exclamative and interrogative",
+            Self::Indefinite(..) => "Indefinite",
+            Self::Negative(..) => "Negative",
+            Self::Past(..) => "Past participle",
+            Self::Possessive(..) => "Possessive",
+            Self::Present(..) => "Present participle",
+            Self::Relative(..) => "Relative",
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Category {
     Noun(String, Gender, String),
     Verb(String, VerbForms),
-    Adjective(String, String, String),
+    Adjective(Adjective),
     Article(String, String, String, Option<String>),
     Conjunction(String),
     Pronoun(Pronoun),
     Preposition(String),
     Adverb(String),
     Interjection(String),
+    Number(String, Option<String>, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>),
     Other(String),
 }
 
-fn get_plural(string: &str) -> String {
-    if string.ends_with("al") || string.ends_with("au") {
-        string[0..string.len()-2].to_string() + "aux"
-    } else if string.ends_with("ail") {
-        string[0..string.len()-3].to_string() + "aux"
-    } else if string.ends_with("eu") || string.ends_with("ou") {
-        string.to_string() + "x"
-    } else if !string.ends_with("s") && !string.ends_with("x") && !string.ends_with("z") {
-        string.to_string() + "s"
-    } else {
-        string.to_string()
-    }
-}
+// #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// pub enum CategoryOld {
+//     Noun(String, Gender, String),
+//     Verb(String, VerbForms),
+//     Adjective(String, String, String, String),
+//     Article(String, String, String, Option<String>),
+//     Conjunction(String),
+//     Pronoun(Pronoun),
+//     Preposition(String),
+//     Adverb(String),
+//     Interjection(String),
+//     Number(String, Option<String>, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>),
+//     Other(String),
+// }
 
 impl Category {
     pub fn to_u16(&self) -> u16 {
@@ -148,7 +177,8 @@ impl Category {
             Self::Interjection(_) => 0b1000000,
             Self::Preposition(_) => 0b10000000,
             Self::Pronoun(..) => 0b100000000,
-            Self::Other(_) => 0b11111111,
+            Self::Number(..) => 0b1000000000,
+            Self::Other(_) => 0b10000000000,
         }
     }
 
@@ -175,7 +205,18 @@ impl Category {
                     VerbForms::Regular(..) => format!("{} ({}, {}), regular verb", name, swedish, english),
                 }
             }
-            Self::Adjective(female, male, plural) => format!("{}/{}/{} ({}, {}), adjective", male, female, plural, swedish, english),
+            Self::Adjective(adjective) => {
+                match adjective {
+                    Adjective::Demonstrative(singular, plural) => format!("{}/{} ({}, {}), demonstrative adjective", singular, plural, swedish, english),
+                    Adjective::ExclamativeInterrogative(s_m, s_f, p_m, p_f) => format!("{}/{}/{}/{} ({}, {}), exclamative and interrogative adjective", s_m, s_f, p_m, p_f, swedish, english),
+                    Adjective::Indefinite(s_m, s_f, p_m, p_f) => format!("{}/{}/{}/{} ({}, {}), indefinite adjective", s_m, s_f, p_m, p_f, swedish, english),
+                    Adjective::Negative(male, female) => format!("ne ... {}/ne ... {} ({}, {}), negative adjective", male, female, swedish, english),
+                    Adjective::Past(s_m, s_f, p_m, p_f) => format!("{}/{}/{}/{} ({}, {}), past participle adjective", s_m, s_f, p_m, p_f, swedish, english),
+                    Adjective::Possessive(male, female, plural) => format!("{}/{}/{} ({}, {}), possessive adjective", male, female, plural, swedish, english),
+                    Adjective::Present(s_m, s_f, p_m, p_f) => format!("{}/{}/{}/{} ({}, {}), present participle adjective", s_m, s_f, p_m, p_f, swedish, english),
+                    Adjective::Relative(s_m, s_f, p_m, p_f) => format!("{}/{}/{}/{} ({}, {}), relative adjective", s_m, s_f, p_m, p_f, swedish, english),
+                }
+            }
             Self::Adverb(string) => format!("{} ({}, {}), adverb", string, swedish, english),
             Self::Article(male, female, plural, vowel) => {
                 match vowel {
@@ -207,7 +248,7 @@ impl Category {
                     Pronoun::IndefiniteRelative(string) => format!("{} ({}, {}), indefinite relative pronoun", string, swedish, english),
                     Pronoun::Interrogative(string) => format!("{} ({}, {}), interrogative pronoun", string, swedish, english),
                     Pronoun::Negative(string) => format!("ne ... {} ({}, {}), negative pronoun", string, swedish, english),
-                    Pronoun::Possessive(s_m, s_f, p_m, p_f) => format!("{}/{}/{}/{} ({}, {}), possesive pronoun", s_m, s_f, p_m, p_f, swedish, english),
+                    Pronoun::Possessive(s_m, s_f, p_m, p_f) => format!("{}/{}/{}/{} ({}, {}), possessive pronoun", s_m, s_f, p_m, p_f, swedish, english),
                     Pronoun::Relative(string, others) => {
                         match others {
                             None => format!("{} ({}, {}), relative pronoun", string, swedish, english),
@@ -216,8 +257,54 @@ impl Category {
                     }
                 }
             }
+            Self::Number(cardinal, cardinal_female, ordinal, ordinal_female, multiplicative, approximate, fraction, fraction_other) => {
+                let mut string = cardinal.to_owned();
+                if let Some(cardinal_female) = cardinal_female {
+                    string += "/";
+                    string += cardinal_female;
+                }
+                string += "/";
+                string += ordinal;
+                if let Some(ordinal_female) = ordinal_female {
+                    string += "/";
+                    string += ordinal_female;
+                }
+                if let Some(multiplicative) = multiplicative {
+                    string += "/";
+                    string += multiplicative;
+                }
+                if let Some(approximate) = approximate {
+                    string += "/";
+                    string += approximate;
+                }
+                if let Some(fraction) = fraction {
+                    string += "/";
+                    string += fraction;
+                }
+                if let Some(fraction_other) = fraction_other {
+                    string += "/";
+                    string += fraction_other;
+                }
+                format!("{} ({}), number", string, swedish)
+            }
         }
     }
+
+    // fn from_old(old: CategoryOld) -> Self {
+    //     match old {
+    //         CategoryOld::Adjective(a, b, c, d) => Self::Adjective(Adjective::Indefinite(a, b, c, d)),
+    //         CategoryOld::Article(a, b, c, d) => Self::Article(a, b, c, d),
+    //         CategoryOld::Adverb(a) => Self::Adverb(a),
+    //         CategoryOld::Conjunction(a) => Self::Conjunction(a),
+    //         CategoryOld::Interjection(a) => Self::Interjection(a),
+    //         CategoryOld::Noun(a, b, c) => Self::Noun(a, b, c),
+    //         CategoryOld::Other(a) => Self::Other(a),
+    //         CategoryOld::Preposition(a) => Self::Preposition(a),
+    //         CategoryOld::Pronoun(a) => Self::Pronoun(a),
+    //         CategoryOld::Verb(a, b) => Self::Verb(a, b),
+    //         CategoryOld::Number(a, b, c, d, e, f, g, h) => Self::Number(a, b, c, d, e, f, g, h),
+    //     }
+    // }
 }
 
 impl Display for Category {
@@ -232,7 +319,8 @@ impl Display for Category {
             Self::Conjunction(_) => "Conjunction",
             Self::Interjection(_) => "Interjection",
             Self::Preposition(_) => "Preposition",
-            Self::Pronoun(..) => "Pronoun"
+            Self::Pronoun(..) => "Pronoun",
+            Self::Number(..) => "Number",
         })
     }
 }
@@ -245,77 +333,118 @@ pub struct Item {
     category_int: u16,
 }
 
+// #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+// pub struct ItemOld {
+//     pub swedish: Option<String>,
+//     pub english: Option<String>,
+//     pub category: CategoryOld,
+//     category_int: u16,
+// }
+
 impl Item {
     pub fn new(swedish: Option<String>, english: Option<String>, category: Category) -> Self {
         let category_int = category.to_u16();
         Self { swedish, english, category, category_int }
     }
 
-    fn language_strings(&self, language: &Language) -> Option<Vec<String>> {
+    fn language_strings(&self, language: &Language) -> Option<Vec<&String>> {
         match language {
             Language::French => {
                 match &self.category {
-                    Category::Other(string) => Some(vec![string.to_owned()]),
-                    Category::Adjective(female, male, plural) => Some(vec![female.to_owned(), male.to_owned(), plural.to_owned()]),
-                    Category::Noun(string, _, plural) => Some(vec![string.to_owned(), plural.to_owned()]),
+                    Category::Other(string) => Some(vec![string]),
+                    Category::Adjective(adjective) => {
+                        match adjective {
+                            Adjective::Demonstrative(a, b) |
+                            Adjective::Negative(a, b) => Some(vec![a,b]),
+                            Adjective::ExclamativeInterrogative(a, b, c, d) |
+                            Adjective::Indefinite(a, b, c, d) |
+                            Adjective::Past(a, b, c, d) |
+                            Adjective::Present(a, b, c, d) |
+                            Adjective::Relative(a, b, c, d) => Some(vec![a, b, c, d]),
+                            Adjective::Possessive(a, b, c) => Some(vec![a, b, c]),
+                        }
+                    }
+                    Category::Noun(string, _, plural) => Some(vec![string, plural]),
                     Category::Verb(base, form) => {
                         match form {
-                            VerbForms::Regular(je, tu, _, nous, vous, ils) => Some(vec![je.to_owned(), tu.to_owned(), nous.to_owned(), vous.to_owned(), ils.to_owned(), base.to_owned()]),
-                            VerbForms::Irregular(je, tu, il, nous, vous, ils) => Some(vec![je.to_owned(), tu.to_owned(), il.to_owned(), nous.to_owned(), vous.to_owned(), ils.to_owned(), base.to_owned()]),
+                            VerbForms::Regular(je, tu, _, nous, vous, ils) => Some(vec![je, tu, nous, vous, ils, base]),
+                            VerbForms::Irregular(je, tu, il, nous, vous, ils) => Some(vec![je, tu, il, nous, vous, ils, base]),
                         }
                     }
-                    Category::Adverb(string) => Some(vec![string.to_owned()]),
+                    Category::Adverb(string) => Some(vec![string]),
                     Category::Article(male, female, plural, vowel) => {
                         match vowel {
-                            Some(vowel) => Some(vec![male.to_owned(), female.to_owned(), plural.to_owned(), vowel.to_owned()]),
-                            None => Some(vec![male.to_owned(), female.to_owned(), plural.to_owned()]),
+                            Some(vowel) => Some(vec![male, female, plural, vowel]),
+                            None => Some(vec![male, female, plural]),
                         }
                     }
-                    Category::Conjunction(string) => Some(vec![string.to_owned()]),
-                    Category::Interjection(string) => Some(vec![string.to_owned()]),
-                    Category::Preposition(string) => Some(vec![string.to_owned()]),
+                    Category::Conjunction(string) => Some(vec![string]),
+                    Category::Interjection(string) => Some(vec![string]),
+                    Category::Preposition(string) => Some(vec![string]),
                     Category::Pronoun(pronoun) => {
                         match pronoun {
-                            Pronoun::Adverbial(string) => Some(vec![string.to_owned()]),
-                            Pronoun::ImpersonalSubject(string) => Some(vec![string.to_owned()]),
-                            Pronoun::IndefiniteDemonstrative(string) => Some(vec![string.to_owned()]),
-                            Pronoun::IndefiniteRelative(string) => Some(vec![string.to_owned()]),
-                            Pronoun::Interrogative(string) => Some(vec![string.to_owned()]),
-                            Pronoun::Negative(string) => Some(vec![string.to_owned()]),
-                            Pronoun::Demonstrative(s_m, s_f, p_m, p_f) => Some(vec![s_m.to_owned(), s_f.to_owned(), p_m.to_owned(), p_f.to_owned()]),
+                            Pronoun::Adverbial(string) |
+                            Pronoun::ImpersonalSubject(string) |
+                            Pronoun::IndefiniteDemonstrative(string) |
+                            Pronoun::IndefiniteRelative(string) |
+                            Pronoun::Interrogative(string) |
+                            Pronoun::Negative(string) => Some(vec![string]),
+                            Pronoun::Demonstrative(s_m, s_f, p_m, p_f) => Some(vec![s_m, s_f, p_m, p_f]),
                             Pronoun::Indefinite(male, female) => {
                                 match female {
-                                    Some(female) => Some(vec![male.to_owned(), female.to_owned()]),
-                                    None => Some(vec![male.to_owned()]),
+                                    Some(female) => Some(vec![male, female]),
+                                    None => Some(vec![male]),
                                 }
                             }
                             Pronoun::Personal(subject, reflexive, stressed, others) => {
                                 match others {
-                                    Some((direct_object, indirect_object)) => Some(vec![subject.to_owned(), direct_object.to_owned(), indirect_object.to_owned(), reflexive.to_owned(), stressed.to_owned()]),
-                                    None => Some(vec![subject.to_owned(), reflexive.to_owned(), stressed.to_owned()])
+                                    Some((direct_object, indirect_object)) => Some(vec![subject, direct_object, indirect_object, reflexive, stressed]),
+                                    None => Some(vec![subject, reflexive, stressed])
                                 }
                             }
-                            Pronoun::Possessive(s_m, s_f, p_m, p_f) => Some(vec![s_m.to_owned(), s_f.to_owned(), p_m.to_owned(), p_f.to_owned()]),
+                            Pronoun::Possessive(s_m, s_f, p_m, p_f) => Some(vec![s_m, s_f, p_m, p_f]),
                             Pronoun::Relative(string, others) => {
                                 match others {
-                                    Some((s_f, p_m, p_f)) => Some(vec![string.to_owned(), s_f.to_owned(), p_m.to_owned(), p_f.to_owned()]),
-                                    None => Some(vec![string.to_owned()]),
+                                    Some((s_f, p_m, p_f)) => Some(vec![string, s_f, p_m, p_f]),
+                                    None => Some(vec![string]),
                                 }
                             }
                         }
+                    }
+                    Category::Number(cardinal, cardinal_female, ordinal, ordinal_female, multiplicative, approximate, fraction, fraction_female) => {
+                        let mut strings = vec![cardinal, ordinal];
+                        if let Some(cardinal_female) = cardinal_female {
+                            strings.push(cardinal_female);
+                        }
+                        if let Some(ordinal_female) = ordinal_female {
+                            strings.push(ordinal_female);
+                        }
+                        if let Some(multiplicative) = multiplicative {
+                            strings.push(multiplicative);
+                        }
+                        if let Some(approximate) = approximate {
+                            strings.push(approximate);
+                        }
+                        if let Some(fraction) = fraction {
+                            strings.push(fraction);
+                        }
+                        if let Some(fraction_female) = fraction_female {
+                            strings.push(fraction_female);
+                        }
+                        Some(strings)
                     }
                 }
             }
             Language::Swedish => {
                 match &self.swedish {
                     None => None,
-                    Some(string) => Some(vec![string.to_owned()]),
+                    Some(string) => Some(vec![string]),
                 }
             }
             Language::English => {
                 match &self.english {
                     None => None,
-                    Some(string) => Some(vec![string.to_owned()]),
+                    Some(string) => Some(vec![string]),
                 }
             }
         }
@@ -324,6 +453,10 @@ impl Item {
     pub fn tooltip(&self) -> String {
         self.category.display_detailed(&self.english, &self.swedish)
     }
+
+    // fn from_old(old: ItemOld) -> Self {
+    //     Self { swedish: old.swedish, english: old.english, category: Category::from_old(old.category), category_int: old.category_int }
+    // }
 }
 
 #[derive(Debug, PartialEq)]
@@ -379,9 +512,14 @@ pub struct Search {
     items: Vec<Item>,
 }
 
+// #[derive(Debug, Serialize, Deserialize)]
+// pub struct SearchOld {
+//     items: Vec<ItemOld>,
+// }
+
 impl Search {
     pub fn search(&self, query: &Query, num_answers: usize) -> Vec<(String, Item)> {
-        let mut best_matches: Vec<(String, Item)> = Vec::with_capacity(num_answers);
+        let mut best_matches: Vec<(&String, Item)> = Vec::with_capacity(num_answers);
         let mut best_match_scores: Vec<usize> = vec![usize::MAX; num_answers];
 
         for item in &self.items {
@@ -396,7 +534,7 @@ impl Search {
                                 if distance < best_match_scores[i] {
                                     best_match_scores.insert(i, distance);
                                     best_match_scores.truncate(num_answers);
-                                    best_matches.insert(i, list_item);
+                                    best_matches.insert(i, list_item.to_owned());
                                     best_matches.truncate(num_answers);
                                     break;
                                 }
@@ -407,7 +545,7 @@ impl Search {
             }
         }
 
-        best_matches
+        best_matches.iter().map(|(s, x)| (s.to_owned().to_owned(), x.to_owned())).collect()
     }
 
     pub fn add_item(&mut self, item: Item) {
@@ -447,4 +585,26 @@ impl Search {
     pub fn random_item(&self) -> Item {
         self.items.choose(&mut thread_rng()).unwrap().clone()
     }
+
+    // pub fn from_old(old: SearchOld) -> Self {
+    //     Self { items: old.items.iter().map(|x| Item::from_old(x.to_owned())).collect() }
+    // }    
 }
+
+// impl SearchOld {
+//     pub fn load_or_new(file: &str) -> Self {
+//         match File::open(file) {
+//             Ok(mut file) => {
+//                 let mut serialized_data = Vec::new();
+//                 file.read_to_end(&mut serialized_data).unwrap();
+//                 let data: Self = deserialize(&serialized_data).unwrap();
+//                 data
+//             }
+//             Err(_) => {
+//                 Self {
+//                     items: vec![],
+//                 }
+//             }
+//         }
+//     }
+// }

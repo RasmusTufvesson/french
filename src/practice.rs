@@ -1,4 +1,4 @@
-use crate::search::{Category, Language, Search, VerbForms};
+use crate::search::{Adjective, Category, Language, Search, VerbForms};
 use rand::{thread_rng, Rng};
 
 #[derive(PartialEq)]
@@ -41,8 +41,11 @@ pub fn get_practice_question(search: &Search) -> Question {
         Category::Other(s) => {
             Question::translate(s, item.swedish.unwrap(), to_language)
         }
-        Category::Adjective(_, s, _) => {
-            Question::translate_adjective(s, item.swedish.unwrap(), to_language)
+        Category::Adjective(adjective) => {
+            match adjective {
+                Adjective::Indefinite(s, _, _, _) => Question::translate_adjective(s, item.swedish.unwrap(), to_language),
+                _ => unimplemented!()
+            }
         }
         Category::Noun(s, _, plural) => {
             match thread_rng().gen_range(0..=1) {

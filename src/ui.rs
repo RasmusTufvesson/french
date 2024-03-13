@@ -2,7 +2,7 @@
 
 use eframe::{self, egui::{self, Layout}};
 use levenshtein::levenshtein;
-use crate::{explain::{explain, Part}, practice::{get_practice_question, Question}, search::{Category, Gender, Item, Language, Pronoun, Query, Search, VerbForms}};
+use crate::{explain::{explain, Part}, practice::{get_practice_question, Question}, search::{Adjective, Category, Gender, Item, Language, Pronoun, Query, Search, VerbForms}, utils};
 
 #[derive(PartialEq)]
 enum PracticeState {
@@ -559,13 +559,14 @@ impl eframe::App for App {
                         .show_ui(ui, |ui| {
                             ui.selectable_value(category, Category::Noun("".to_string(), Gender::Male, "".to_string()), "Noun");
                             ui.selectable_value(category, Category::Verb("".to_string(), VerbForms::Regular("".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string())), "Verb");
-                            ui.selectable_value(category, Category::Adjective("".to_string(), "".to_string(), "".to_string()), "Adjective");
+                            ui.selectable_value(category, Category::Adjective(Adjective::Indefinite("".to_string(), "".to_string(), "".to_string(), "".to_string())), "Adjective");
                             ui.selectable_value(category, Category::Adverb("".to_string()), "Adverb");
                             ui.selectable_value(category, Category::Article("".to_string(), "".to_string(), "".to_string(), Some("".to_string())), "Article");
                             ui.selectable_value(category, Category::Conjunction("".to_string()), "Conjunction");
                             ui.selectable_value(category, Category::Interjection("".to_string()), "Interjection");
                             ui.selectable_value(category, Category::Preposition("".to_string()), "Preposition");
                             ui.selectable_value(category, Category::Pronoun(Pronoun::Personal("".to_string(), "".to_string(), "".to_string(), Some(("".to_string(), "".to_string())))), "Pronoun");
+                            ui.selectable_value(category, Category::Number("".to_string(), None, "".to_string(), None, Some("".to_string()), Some("".to_string()), Some("".to_string()), None), "Number");
                             ui.selectable_value(category, Category::Other("".to_string()), "Other");
                         }
                     );
@@ -684,19 +685,78 @@ impl eframe::App for App {
                                 }
                             }
                         }
-                        Category::Adjective(female, male, plural) => {
-                            ui.horizontal(|ui| {
-                                ui.add(egui::TextEdit::singleline(male));
-                                ui.label("Male");
-                            });
-                            ui.horizontal(|ui| {
-                                ui.add(egui::TextEdit::singleline(female));
-                                ui.label("Female");
-                            });
-                            ui.horizontal(|ui| {
-                                ui.add(egui::TextEdit::singleline(plural));
-                                ui.label("Plural");
-                            });
+                        Category::Adjective(adjective) => {
+                            egui::ComboBox::from_label("Type of adjective")
+                                .selected_text(format!("{}", adjective))
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(adjective, Adjective::Indefinite("".to_string(), "".to_string(), "".to_string(), "".to_string()), "Indefinite");
+                                    ui.selectable_value(adjective, Adjective::ExclamativeInterrogative("".to_string(), "".to_string(), "".to_string(), "".to_string()), "Exclamative and interrogative");
+                                    ui.selectable_value(adjective, Adjective::Past("".to_string(), "".to_string(), "".to_string(), "".to_string()), "Past participle");
+                                    ui.selectable_value(adjective, Adjective::Present("".to_string(), "".to_string(), "".to_string(), "".to_string()), "Present participle");
+                                    ui.selectable_value(adjective, Adjective::Relative("".to_string(), "".to_string(), "".to_string(), "".to_string()), "Relative");
+                                    ui.selectable_value(adjective, Adjective::Negative("".to_string(), "".to_string()), "Negative");
+                                    ui.selectable_value(adjective, Adjective::Possessive("".to_string(), "".to_string(), "".to_string()), "Possessive");
+                                    ui.selectable_value(adjective, Adjective::Demonstrative("".to_string(), "".to_string()), "Demonstrative");
+                                }
+                            );
+                            match adjective {
+                                Adjective::Indefinite(male, female, plural_male, plural_female) |
+                                Adjective::ExclamativeInterrogative(male, female, plural_male, plural_female) |
+                                Adjective::Past(male, female, plural_male, plural_female) |
+                                Adjective::Present(male, female, plural_male, plural_female) |
+                                Adjective::Relative(male, female, plural_male, plural_female) => {
+                                    ui.horizontal(|ui| {
+                                        ui.add(egui::TextEdit::singleline(male));
+                                        ui.label("Singular male");
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.add(egui::TextEdit::singleline(female));
+                                        ui.label("Singular female");
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.add(egui::TextEdit::singleline(plural_male));
+                                        ui.label("Plural male");
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.add(egui::TextEdit::singleline(plural_female));
+                                        ui.label("Plural female");
+                                    });
+                                }
+                                Adjective::Demonstrative(singular, plural) => {
+                                    ui.horizontal(|ui| {
+                                        ui.add(egui::TextEdit::singleline(singular));
+                                        ui.label("Singular");
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.add(egui::TextEdit::singleline(plural));
+                                        ui.label("Plural");
+                                    });
+                                }
+                                Adjective::Negative(male, female) => {
+                                    ui.horizontal(|ui| {
+                                        ui.add(egui::TextEdit::singleline(male));
+                                        ui.label("Male");
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.add(egui::TextEdit::singleline(female));
+                                        ui.label("Female");
+                                    });
+                                }
+                                Adjective::Possessive(male, female, plural) => {
+                                    ui.horizontal(|ui| {
+                                        ui.add(egui::TextEdit::singleline(male));
+                                        ui.label("Male");
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.add(egui::TextEdit::singleline(female));
+                                        ui.label("Female");
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.add(egui::TextEdit::singleline(plural));
+                                        ui.label("Plural");
+                                    });
+                                }
+                            }
                         }
                         Category::Other(string) | Category::Adverb(string) | Category::Conjunction(string) | Category::Interjection(string) | Category::Preposition(string) => {
                             ui.horizontal(|ui| {
@@ -870,6 +930,123 @@ impl eframe::App for App {
                                         });
                                     }
                                 }
+                            }
+                        }
+                        Category::Number(cardinal, cardinal_female, ordinal, ordinal_female, multiplicative, approximate, fraction, fraction_other) => {
+                            let mut female = if let Some(_) = cardinal_female {
+                                true
+                            } else { false };
+                            if ui.checkbox(&mut female, "Female variant").changed() {
+                                if female {
+                                    *cardinal_female = Some("".to_string());
+                                    *ordinal_female = Some("".to_string());
+                                } else {
+                                    *cardinal_female = None;
+                                    *ordinal_female = None;
+                                }
+                            }
+                            
+                            let response = ui.horizontal(|ui| {
+                                let response = ui.add(egui::TextEdit::singleline(cardinal));
+                                ui.label("Cardinal");
+                                response
+                            });
+
+                            if response.inner.changed() {
+                                let (ordinal_guess, approximate_guess) = utils::number_forms(cardinal);
+                                if let Some(string) = fraction {
+                                    *string = ordinal_guess.clone();
+                                }
+                                *ordinal = ordinal_guess;
+                                if let Some(string) = approximate {
+                                    *string = approximate_guess;
+                                }
+                            }
+
+                            if let Some(string) = cardinal_female {
+                                ui.horizontal(|ui| {
+                                    ui.add(egui::TextEdit::singleline(string));
+                                    ui.label("Cardinal female");
+                                });
+                            }
+
+                            ui.horizontal(|ui| {
+                                ui.add(egui::TextEdit::singleline(ordinal));
+                                ui.label("Ordinal");
+                            });
+                            if let Some(string) = ordinal_female {
+                                ui.horizontal(|ui| {
+                                    ui.add(egui::TextEdit::singleline(string));
+                                    ui.label("Ordinal female");
+                                });
+                            }
+
+                            let mut use_multiplicative = if let Some(_) = multiplicative {
+                                true
+                            } else { false };
+                            if ui.checkbox(&mut use_multiplicative, "Multiplicative").changed() {
+                                if use_multiplicative {
+                                    *multiplicative = Some("".to_string());
+                                } else {
+                                    *multiplicative = None;
+                                }
+                            }
+                            if let Some(string) = multiplicative {
+                                ui.horizontal(|ui| {
+                                    ui.add(egui::TextEdit::singleline(string));
+                                    ui.label("Multiplicative");
+                                });
+                            }
+
+                            let mut use_approximate = if let Some(_) = approximate {
+                                true
+                            } else { false };
+                            if ui.checkbox(&mut use_approximate, "Approximate").changed() {
+                                if use_approximate {
+                                    *approximate = Some("".to_string());
+                                } else {
+                                    *approximate = None;
+                                }
+                            }
+                            if let Some(string) = approximate {
+                                ui.horizontal(|ui| {
+                                    ui.add(egui::TextEdit::singleline(string));
+                                    ui.label("Approximate");
+                                });
+                            }
+
+                            let mut use_fraction = if let Some(_) = fraction {
+                                true
+                            } else { false };
+                            if ui.checkbox(&mut use_fraction, "Fraction").changed() {
+                                if use_fraction {
+                                    *fraction = Some("".to_string());
+                                } else {
+                                    *fraction = None;
+                                    *fraction_other = None;
+                                }
+                            }
+                            if let Some(string) = fraction {
+                                let mut two = if let Some(_) = fraction_other {
+                                    true
+                                } else { false };
+                                if ui.checkbox(&mut two, "Two fractions").changed() {
+                                    if two {
+                                        *fraction_other = Some("".to_string());
+                                    } else {
+                                        *fraction_other = None;
+                                    }
+                                }
+                                ui.horizontal(|ui| {
+                                    ui.add(egui::TextEdit::singleline(string));
+                                    ui.label("Fraction");
+                                });
+                            }
+                            if let Some(string) = fraction_other {
+                                ui.horizontal(|ui| {
+                                    ui.add(egui::TextEdit::singleline(string));
+                                    ui.label("Fraction");
+                                });
                             }
                         }
                     }
