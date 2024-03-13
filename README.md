@@ -4,7 +4,6 @@ This is a small program i made to have some fun and improve my french. You can s
 ## Todo
 * Add filter option to practice
 * Make words you know not appear multiple times in practice
-* Add more types of adjectives, eg numerical adjectives
-* Make default adjectives have 4 forms (male and female plural)
-* Add filtering for the new word classes
 * Make practice work with the new word classes
+* Replace verbs tab with details tab that works with all words
+* Make explain be able to have multiple options for words if some have the same letter difference

@@ -32,6 +32,14 @@ struct SearchCategories {
     noun: bool,
     verb: bool,
     adjective: bool,
+    adverb: bool,
+    article: bool,
+    conjunction: bool,
+    interjection: bool,
+    preposition: bool,
+    pronoun: bool,
+    number: bool,
+    other: bool,
 }
 
 impl SearchCategories {
@@ -46,14 +54,38 @@ impl SearchCategories {
         if self.adjective {
             int += 0b100;
         }
+        if self.adverb {
+            int += 0b1000;
+        }
+        if self.article {
+            int += 0b10000;
+        }
+        if self.conjunction {
+            int += 0b100000;
+        }
+        if self.interjection {
+            int += 0b1000000;
+        }
+        if self.preposition {
+            int += 0b10000000;
+        }
+        if self.pronoun {
+            int += 0b100000000;
+        }
+        if self.number {
+            int += 0b1000000000;
+        }
+        if self.other {
+            int += 0b10000000000;
+        }
         if int == 0 {
-            int = 0b1111111111111111;
+            int = u16::MAX;
         }
         int
     }
 
     fn new() -> Self {
-        Self { noun: false, verb: false, adjective: false }
+        Self { noun: false, verb: false, adjective: false, adverb: false, article: false, conjunction: false, interjection: false, preposition: false, pronoun: false, number: false, other: false }
     }
 }
 
@@ -273,7 +305,15 @@ impl eframe::App for App {
         
                     if ui.checkbox(&mut self.categories.noun, "Nouns").changed() |
                     ui.checkbox(&mut self.categories.verb, "Verbs").changed() |
-                    ui.checkbox(&mut self.categories.adjective, "Adjectives").changed() {
+                    ui.checkbox(&mut self.categories.adjective, "Adjectives").changed() |
+                    ui.checkbox(&mut self.categories.adverb, "Adverbs").changed() |
+                    ui.checkbox(&mut self.categories.article, "Articles").changed() |
+                    ui.checkbox(&mut self.categories.conjunction, "Conjunctions").changed() |
+                    ui.checkbox(&mut self.categories.interjection, "Interjections").changed() |
+                    ui.checkbox(&mut self.categories.preposition, "Prepositions").changed() |
+                    ui.checkbox(&mut self.categories.pronoun, "Pronouns").changed() |
+                    ui.checkbox(&mut self.categories.number, "Numbers").changed() |
+                    ui.checkbox(&mut self.categories.other, "Other").changed() {
                         self.gen_results();
                     }
                 });
