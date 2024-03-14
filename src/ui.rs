@@ -1,12 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use eframe::{self, egui::{self, Layout}};
+use eframe::{self, egui};
 use levenshtein::levenshtein;
 use crate::{explain::{explain, Part}, practice::{get_practice_question, Question}, search::{Adjective, Category, Gender, Item, Language, Pronoun, Query, Search, VerbForms}, utils};
 
 #[derive(PartialEq)]
 enum PracticeState {
-    Wrong(String, String, String, usize),
+    Wrong(String, String, String, usize, Item),
     Question(Question),
 }
 
@@ -14,7 +14,7 @@ enum PracticeState {
 enum Tab {
     Words,
     Sentences,
-    Verbs,
+    Details(Item),
     Practice(PracticeState),
     Explain,
 }
@@ -94,8 +94,7 @@ pub struct App {
     search_sentences: Search,
     query_string: String,
     tab: Tab,
-    results_words: Vec<(String, Item)>,
-    results_sentences: Vec<(String, Item)>,
+    results_search: Vec<(String, Item)>,
     num_answers: usize,
     language: Language,
     popup: PopupWindow,
@@ -103,8 +102,7 @@ pub struct App {
     search_sentences_file: String,
     categories: SearchCategories,
     min_num_answers: usize,
-    results_verbs: (Option<String>, Option<String>, String, VerbForms),
-    result_explain: Vec<Part>
+    result_explain: Vec<Part>,
 }
 
 impl App {
@@ -114,8 +112,7 @@ impl App {
             search_sentences,
             query_string: "".to_string(),
             tab: Tab::Words,
-            results_words: vec![],
-            results_sentences: vec![],
+            results_search: vec![],
             num_answers: 0,
             language: Language::French,
             popup: PopupWindow::None,
@@ -123,7 +120,6 @@ impl App {
             search_sentences_file,
             categories: SearchCategories::new(),
             min_num_answers: 0,
-            results_verbs: (None, None, "".to_string(), VerbForms::Regular("".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string())),
             result_explain: vec![],
         };
         app
@@ -133,23 +129,11 @@ impl App {
         self.num_answers = self.min_num_answers;
         match self.tab {
             Tab::Words => {
-                self.results_words = self.search_words.search(&self.gen_query(), self.num_answers);
+                self.results_search = self.search_words.search(&self.gen_query(), self.num_answers);
             }
             Tab::Sentences => {
-                self.results_sentences = self.search_sentences.search(&self.gen_query(), self.num_answers);
+                self.results_search = self.search_sentences.search(&self.gen_query(), self.num_answers);
             }
-            Tab::Verbs => {
-                let results = self.search_words.search(&Query::new(&self.query_string, &self.language, 0b10), 1);
-                if results.len() != 0 {
-                    let result = &results[0].1;
-                    match &result.category {
-                        Category::Verb(name, form) => {
-                            self.results_verbs = (result.swedish.clone(), result.english.clone(), name.clone(), form.clone());
-                        }
-                        _ => {}
-                    }
-                }
-            },
             Tab::Explain => {
                 self.result_explain = explain(&self.query_string, &self.search_words);
             }
@@ -169,7 +153,7 @@ impl App {
                         *state = PracticeState::Question(get_practice_question(&self.search_words));
                         self.query_string.clear();
                     } else {
-                        *state = PracticeState::Wrong(question.string.clone(), question.answer.clone(), self.query_string.clone(), levenshtein(&question.answer, &self.query_string));
+                        *state = PracticeState::Wrong(question.string.clone(), question.answer.clone(), self.query_string.clone(), levenshtein(&question.answer, &self.query_string), question.item.clone());
                     }
                 }
             }
@@ -185,21 +169,14 @@ impl eframe::App for App {
             egui::menu::bar(ui, |ui| {
                 if ui.button("Words").clicked() {
                     self.tab = Tab::Words;
-                    self.results_words.clear();
+                    self.results_search.clear();
                     self.query_string.clear();
                     self.popup = PopupWindow::None;
                     self.gen_results();
                 }
                 if ui.button("Sentences").clicked() {
                     self.tab = Tab::Sentences;
-                    self.results_sentences.clear();
-                    self.query_string.clear();
-                    self.popup = PopupWindow::None;
-                    self.gen_results();
-                }
-                if ui.button("Verbs").clicked() {
-                    self.tab = Tab::Verbs;
-                    self.results_verbs = (None, None, "".to_string(), VerbForms::Regular("".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string()));
+                    self.results_search.clear();
                     self.query_string.clear();
                     self.popup = PopupWindow::None;
                     self.gen_results();
@@ -231,7 +208,7 @@ impl eframe::App for App {
                                     if ui.selectable_value(&mut self.language, Language::French, "French").clicked() |
                                     ui.selectable_value(&mut self.language, Language::Swedish, "Swedish").clicked() |
                                     ui.selectable_value(&mut self.language, Language::English, "English").clicked() {
-                                        self.results_sentences.clear();
+                                        self.results_search.clear();
                                         self.query_string.clear();
                                         self.popup = PopupWindow::None;
                                         self.gen_results();
@@ -251,7 +228,7 @@ impl eframe::App for App {
                                     if ui.selectable_value(&mut self.language, Language::French, "French").clicked() |
                                     ui.selectable_value(&mut self.language, Language::Swedish, "Swedish").clicked() |
                                     ui.selectable_value(&mut self.language, Language::English, "English").clicked() {
-                                        self.results_sentences.clear();
+                                        self.results_search.clear();
                                         self.query_string.clear();
                                         self.popup = PopupWindow::None;
                                         self.gen_results();
@@ -260,23 +237,7 @@ impl eframe::App for App {
                             );
                             ui.separator();
                         }
-                        Tab::Verbs => {
-                            egui::ComboBox::from_id_source("Language")
-                                .selected_text(format!("{}", self.language))
-                                .show_ui(ui, |ui| {
-                                    if ui.selectable_value(&mut self.language, Language::French, "French").clicked() |
-                                    ui.selectable_value(&mut self.language, Language::Swedish, "Swedish").clicked() |
-                                    ui.selectable_value(&mut self.language, Language::English, "English").clicked() {
-                                        self.results_sentences.clear();
-                                        self.query_string.clear();
-                                        self.popup = PopupWindow::None;
-                                        self.gen_results();
-                                    }
-                                }
-                            );
-                            ui.separator();
-                        }
-                        Tab::Practice(_) => {
+                        Tab::Details(_) | Tab::Practice(_) => {
 
                         }
                         Tab::Explain => {
@@ -322,55 +283,334 @@ impl eframe::App for App {
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
+            let width = ui.available_width();
             match &self.tab {
-                Tab::Verbs => {
-                    ui.with_layout(Layout::top_down_justified(eframe::emath::Align::Center), |ui| {
-                        egui::Grid::new("verb_grid")
-                            .num_columns(2)
-                            .spacing([40.0, 4.0])
-                            .striped(true)
-                            .min_col_width(ui.available_width()/2.0)
-                            .show(ui, |ui| {
-                                let mut translation = false;
-                                if let Some(string) = &self.results_verbs.0 {
-                                    ui.label("Swedish");
-                                    ui.label(string);
+                Tab::Details(item) => {
+                    egui::Grid::new("verb_grid")
+                        .num_columns(2)
+                        .spacing([40.0, 4.0])
+                        .striped(true)
+                        .min_col_width(width / 2.)
+                        .show(ui, |ui| {
+                            let mut translation = false;
+                            if let Some(string) = &item.swedish {
+                                ui.label("Swedish");
+                                ui.label(string);
+                                ui.end_row();
+                                translation = true;
+                            }
+                            if let Some(string) = &item.english {
+                                ui.label("English");
+                                ui.label(string);
+                                ui.end_row();
+                                translation = true;
+                            }
+                            if translation {
+                                ui.end_row();
+                            }
+                            match &item.category {
+                                Category::Verb(name, forms) => {
+                                    ui.label("Type");
+                                    match forms {
+                                        VerbForms::Regular(..) => {
+                                            ui.label("Regular verb");
+                                        }
+                                        VerbForms::Irregular(..) => {
+                                            ui.label("Irregular verb");
+                                        }
+                                    }
                                     ui.end_row();
-                                    translation = true;
-                                }
-                                if let Some(string) = &self.results_verbs.1 {
-                                    ui.label("English");
-                                    ui.label(string);
+                                    ui.label("Name");
+                                    ui.label(name);
                                     ui.end_row();
-                                    translation = true;
-                                }
-                                if translation {
+                                    let (VerbForms::Regular(je, tu, il, nous, vous, ils) | VerbForms::Irregular(je, tu, il, nous, vous, ils)) = &forms;
+                                    ui.label("Je");
+                                    ui.label(je);
+                                    ui.end_row();
+                                    ui.label("Tu");
+                                    ui.label(tu);
+                                    ui.end_row();
+                                    ui.label("Il/elle/on");
+                                    ui.label(il);
+                                    ui.end_row();
+                                    ui.label("Nous");
+                                    ui.label(nous);
+                                    ui.end_row();
+                                    ui.label("Vous");
+                                    ui.label(vous);
+                                    ui.end_row();
+                                    ui.label("Ils/elles");
+                                    ui.label(ils);
                                     ui.end_row();
                                 }
-                                ui.label("Name");
-                                ui.label(&self.results_verbs.2);
-                                ui.end_row();
-                                let (VerbForms::Regular(je, tu, il, nous, vous, ils) | VerbForms::Irregular(je, tu, il, nous, vous, ils)) = &self.results_verbs.3;
-                                ui.label("Je");
-                                ui.label(je);
-                                ui.end_row();
-                                ui.label("Tu");
-                                ui.label(tu);
-                                ui.end_row();
-                                ui.label("Il/elle/on");
-                                ui.label(il);
-                                ui.end_row();
-                                ui.label("Nous");
-                                ui.label(nous);
-                                ui.end_row();
-                                ui.label("Vous");
-                                ui.label(vous);
-                                ui.end_row();
-                                ui.label("Ils/elles");
-                                ui.label(ils);
-                                ui.end_row();
-                            });
-                    });
+                                Category::Adjective(adjective) => {
+                                    ui.label("Type");
+                                    ui.label(format!("{} adjective", adjective.to_string()));
+                                    ui.end_row();
+                                    match adjective {
+                                        Adjective::Demonstrative(singular, plural) => {
+                                            ui.label("Singular");
+                                            ui.label(singular);
+                                            ui.end_row();
+                                            ui.label("Plural");
+                                            ui.label(plural);
+                                            ui.end_row();
+                                        }
+                                        Adjective::Indefinite(male, female, plural_male, plural_female) |
+                                        Adjective::ExclamativeInterrogative(male, female, plural_male, plural_female) |
+                                        Adjective::Past(male, female, plural_male, plural_female) |
+                                        Adjective::Present(male, female, plural_male, plural_female) |
+                                        Adjective::Relative(male, female, plural_male, plural_female) => {
+                                            ui.label("Singular male");
+                                            ui.label(male);
+                                            ui.end_row();
+                                            ui.label("Singular female");
+                                            ui.label(female);
+                                            ui.end_row();
+                                            ui.label("Plural male");
+                                            ui.label(plural_male);
+                                            ui.end_row();
+                                            ui.label("Plural female");
+                                            ui.label(plural_female);
+                                            ui.end_row();
+                                        }
+                                        Adjective::Negative(male, female) => {
+                                            ui.label("Male");
+                                            ui.label(male);
+                                            ui.end_row();
+                                            ui.label("Female");
+                                            ui.label(female);
+                                            ui.end_row();
+                                        }
+                                        Adjective::Possessive(male, female, plural) => {
+                                            ui.label("Male");
+                                            ui.label(male);
+                                            ui.end_row();
+                                            ui.label("Female");
+                                            ui.label(female);
+                                            ui.end_row();
+                                            ui.label("Plural");
+                                            ui.label(plural);
+                                            ui.end_row();
+                                        }
+                                    }
+                                }
+                                Category::Adverb(adverb) => {
+                                    ui.label("Type");
+                                    ui.label("Adverb");
+                                    ui.end_row();
+                                    ui.label("French");
+                                    ui.label(adverb);
+                                    ui.end_row();
+                                }
+                                Category::Article(male, female, plural, elision) => {
+                                    ui.label("Type");
+                                    ui.label("Article");
+                                    ui.end_row();
+                                    ui.label("Male");
+                                    ui.label(male);
+                                    ui.end_row();
+                                    ui.label("Female");
+                                    ui.label(female);
+                                    ui.end_row();
+                                    ui.label("Plural");
+                                    ui.label(plural);
+                                    ui.end_row();
+                                    if let Some(elision) = elision {
+                                        ui.label("Elision").on_hover_text_at_pointer("Next word begins with vowel or h");
+                                        ui.label(elision);
+                                        ui.end_row();
+                                    }
+                                }
+                                Category::Conjunction(conjunction) => {
+                                    ui.label("Type");
+                                    ui.label("Conjunction");
+                                    ui.end_row();
+                                    ui.label("French");
+                                    ui.label(conjunction);
+                                    ui.end_row();
+                                }
+                                Category::Interjection(interjection) => {
+                                    ui.label("Type");
+                                    ui.label("Interjection");
+                                    ui.end_row();
+                                    ui.label("French");
+                                    ui.label(interjection);
+                                    ui.end_row();
+                                }
+                                Category::Noun(noun, gender, plural) => {
+                                    ui.label("Type");
+                                    ui.label(match gender {
+                                        Gender::Male => "Male noun",
+                                        Gender::Female => "Female noun",
+                                    });
+                                    ui.end_row();
+                                    ui.label("Singular");
+                                    ui.label(noun);
+                                    ui.end_row();
+                                    ui.label("Plural");
+                                    ui.label(plural);
+                                    ui.end_row();
+                                }
+                                Category::Number(cardinal, cardinal_female, ordinal, ordinal_female, multiplicative, approximate, fraction, fraction_other) => {
+                                    ui.label("Type");
+                                    ui.label("Number");
+                                    ui.end_row();
+                                    if let Some(female) = cardinal_female {
+                                        ui.label("Cardinal male");
+                                        ui.label(cardinal);
+                                        ui.end_row();
+                                        ui.label("Cardinal female");
+                                        ui.label(female);
+                                        ui.end_row();
+                                    } else {
+                                        ui.label("Cardinal");
+                                        ui.label(cardinal);
+                                        ui.end_row();
+                                    }
+                                    if let Some(female) = ordinal_female {
+                                        ui.label("Ordinal male");
+                                        ui.label(ordinal);
+                                        ui.end_row();
+                                        ui.label("Ordinal female");
+                                        ui.label(female);
+                                        ui.end_row();
+                                    } else {
+                                        ui.label("Ordinal");
+                                        ui.label(ordinal);
+                                        ui.end_row();
+                                    }
+                                    if let Some(multiplicative) = multiplicative {
+                                        ui.label("Multiplicative");
+                                        ui.label(multiplicative);
+                                        ui.end_row();
+                                    }
+                                    if let Some(approximate) = approximate {
+                                        ui.label("Approximate");
+                                        ui.label(approximate);
+                                        ui.end_row();
+                                    }
+                                    if let Some(fraction) = fraction {
+                                        ui.end_row();
+                                        ui.label("Fraction");
+                                        ui.label(&format!("1/{}", item.swedish.clone().unwrap()));
+                                        ui.end_row();
+                                        ui.label("Fraction");
+                                        ui.label(fraction);
+                                        ui.end_row();
+                                        if let Some(fraction_other) = fraction_other {
+                                            ui.label("Fraction");
+                                            ui.label(fraction_other);
+                                            ui.end_row();
+                                        }
+                                    }
+                                }
+                                Category::Other(other) => {
+                                    ui.label("Type");
+                                    ui.label("Other");
+                                    ui.end_row();
+                                    ui.label("French");
+                                    ui.label(other);
+                                    ui.end_row();
+                                }
+                                Category::Preposition(preposition) => {
+                                    ui.label("Type");
+                                    ui.label("Preposition");
+                                    ui.end_row();
+                                    ui.label("French");
+                                    ui.label(preposition);
+                                    ui.end_row();
+                                }
+                                Category::Pronoun(pronoun) => {
+                                    ui.label("Type");
+                                    ui.label(&format!("{} pronoun", pronoun.to_string()));
+                                    ui.end_row();
+                                    match pronoun {
+                                        Pronoun::Adverbial(string) |
+                                        Pronoun::ImpersonalSubject(string) |
+                                        Pronoun::IndefiniteDemonstrative(string) |
+                                        Pronoun::IndefiniteRelative(string) |
+                                        Pronoun::Interrogative(string) => {
+                                            ui.label("French");
+                                            ui.label(string);
+                                            ui.end_row();
+                                        }
+                                        Pronoun::Negative(string) => {
+                                            ui.label("French");
+                                            ui.label(format!("ne ... {}", string));
+                                            ui.end_row();
+                                        }
+                                        Pronoun::Demonstrative(s_m, s_f, p_m, p_f) |
+                                        Pronoun::Possessive(s_m, s_f, p_m, p_f) => {
+                                            ui.label("Singular male");
+                                            ui.label(s_m);
+                                            ui.end_row();
+                                            ui.label("Singular female");
+                                            ui.label(s_f);
+                                            ui.end_row();
+                                            ui.label("Plural male");
+                                            ui.label(p_m);
+                                            ui.end_row();
+                                            ui.label("Plural female");
+                                            ui.label(p_f);
+                                            ui.end_row();
+                                        }
+                                        Pronoun::Indefinite(male, female) => {
+                                            ui.label("Male");
+                                            ui.label(male);
+                                            ui.end_row();
+                                            if let Some(female) = female {
+                                                ui.label("Female");
+                                                ui.label(female);
+                                                ui.end_row();
+                                            }
+                                        }
+                                        Pronoun::Personal(subject, reflexive, stressed, others) => {
+                                            ui.label("Subject");
+                                            ui.label(subject);
+                                            ui.end_row();
+                                            if let Some((direct_object, indirect_object)) = others {
+                                                ui.label("Direct object");
+                                                ui.label(direct_object);
+                                                ui.end_row();
+                                                ui.label("Indirect object");
+                                                ui.label(indirect_object);
+                                                ui.end_row();
+                                            }
+                                            ui.label("Reflexive");
+                                            ui.label(reflexive);
+                                            ui.end_row();
+                                            ui.label("Stressed");
+                                            ui.label(stressed);
+                                            ui.end_row();
+                                        }
+                                        Pronoun::Relative(string, others) => {
+                                            match others {
+                                                None => {
+                                                    ui.label("French");
+                                                    ui.label(string);
+                                                    ui.end_row();
+                                                }
+                                                Some((s_f, p_m, p_f)) => {
+                                                    ui.label("Singular male");
+                                                    ui.label(string);
+                                                    ui.end_row();
+                                                    ui.label("Singular female");
+                                                    ui.label(s_f);
+                                                    ui.end_row();
+                                                    ui.label("Plural male");
+                                                    ui.label(p_m);
+                                                    ui.end_row();
+                                                    ui.label("Plural female");
+                                                    ui.label(p_f);
+                                                    ui.end_row();
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
                 }
                 Tab::Words |
                 Tab::Sentences => {
@@ -384,8 +624,7 @@ impl eframe::App for App {
                                         self.gen_results();
                                     }
                                 }
-                                let mut update_results = false;
-                                for (i, (string, item)) in self.results_words.iter().enumerate() {
+                                for (i, (string, item)) in self.results_search.iter().enumerate() {
                                     if i >= self.min_num_answers {
                                         break;
                                     }
@@ -394,13 +633,10 @@ impl eframe::App for App {
                                         ui.label(format!("{}", item.tooltip()));
                                     });
                                     response.context_menu(|ui| {
-                                        if let Category::Verb(name, _) = &item.category {
-                                            if ui.button("Open in verb view").clicked() {
-                                                ui.close_menu();
-                                                self.tab = Tab::Verbs;
-                                                self.query_string = name.clone();
-                                                update_results = true;
-                                            }
+                                        if ui.button("Details").clicked() {
+                                            ui.close_menu();
+                                            self.tab = Tab::Details(item.to_owned());
+                                            self.popup = PopupWindow::None;
                                         }
                                         if ui.button("Edit").clicked() {
                                             ui.close_menu();
@@ -418,9 +654,6 @@ impl eframe::App for App {
                                         }
                                     });
                                 }
-                                if update_results {
-                                    self.gen_results();
-                                }
                             }
                             Tab::Sentences => {
                                 let num_results = ((ui.available_height() - 24.0) / 17.0).round() as usize;
@@ -431,7 +664,7 @@ impl eframe::App for App {
                                     }
                                 }
                                 let mut update_results = false;
-                                for (i, (string, item)) in self.results_sentences.iter().enumerate() {
+                                for (i, (string, item)) in self.results_search.iter().enumerate() {
                                     if i >= self.min_num_answers {
                                         break;
                                     }
@@ -482,7 +715,7 @@ impl eframe::App for App {
                             PracticeState::Question(question) => {
                                 ui.heading(&question.string);
                             }
-                            PracticeState::Wrong(question, correct, answer, difference) => {
+                            PracticeState::Wrong(question, correct, answer, difference, _) => {
                                 ui.heading(question);
                                 ui.label(format!("The correct answer was '{}', not '{}'.", correct, answer));
                                 if difference <= &2 {
@@ -507,8 +740,29 @@ impl eframe::App for App {
                                     } else {
                                         ui.label(&format!("{}?", part.matched[part.chosen].0))
                                     };
-                                    response.on_hover_ui_at_pointer(|ui| {
+                                    response.clone().on_hover_ui_at_pointer(|ui| {
                                         ui.label(format!("({}) {}", &part.string, part.matched[part.chosen].1.tooltip()));
+                                    });
+                                    response.context_menu(|ui| {
+                                        if ui.button("Details").clicked() {
+                                            ui.close_menu();
+                                            self.tab = Tab::Details(part.matched[part.chosen].1.to_owned());
+                                            self.popup = PopupWindow::None;
+                                        }
+                                        if ui.button("Edit").clicked() {
+                                            ui.close_menu();
+                                            self.popup = PopupWindow::AddWord(match part.matched[part.chosen].1.swedish.clone() {
+                                                None => "".to_string(),
+                                                Some(val) => val,
+                                            }, match part.matched[part.chosen].1.english.clone() {
+                                                None => "".to_string(),
+                                                Some(val) => val,
+                                            }, part.matched[part.chosen].1.category.clone(), "".to_string(), Some(self.search_words.get_item_index(&part.matched[part.chosen].1)));
+                                        }
+                                        if ui.button("Delete").clicked() {
+                                            ui.close_menu();
+                                            self.popup = PopupWindow::DeleteWord(self.search_words.get_item_index(&part.matched[part.chosen].1));
+                                        }
                                     });
                                 } else {
                                     for (i, matched) in part.matched.iter().enumerate() {
@@ -517,55 +771,95 @@ impl eframe::App for App {
                                         } else {
                                             ui.selectable_value(&mut part.chosen, i, &format!("{}?", matched.0))
                                         };
-                                        response.on_hover_ui_at_pointer(|ui| {
+                                        response.clone().on_hover_ui_at_pointer(|ui| {
                                             ui.label(format!("({}) {}", &part.string, matched.1.tooltip()));
+                                        });
+                                        response.context_menu(|ui| {
+                                            if ui.button("Details").clicked() {
+                                                ui.close_menu();
+                                                self.tab = Tab::Details(part.matched[part.chosen].1.to_owned());
+                                                self.popup = PopupWindow::None;
+                                            }
+                                            if ui.button("Edit").clicked() {
+                                                ui.close_menu();
+                                                self.popup = PopupWindow::AddWord(match part.matched[part.chosen].1.swedish.clone() {
+                                                    None => "".to_string(),
+                                                    Some(val) => val,
+                                                }, match part.matched[part.chosen].1.english.clone() {
+                                                    None => "".to_string(),
+                                                    Some(val) => val,
+                                                }, part.matched[part.chosen].1.category.clone(), "".to_string(), Some(self.search_words.get_item_index(&part.matched[part.chosen].1)));
+                                            }
+                                            if ui.button("Delete").clicked() {
+                                                ui.close_menu();
+                                                self.popup = PopupWindow::DeleteWord(self.search_words.get_item_index(&part.matched[part.chosen].1));
+                                            }
                                         });
                                     }
                                 }
                             }
                         });
                         ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
-                            if self.language == Language::Swedish {
-                                for part in &self.result_explain {
-                                    let response = if part.sure {
-                                        ui.label(&part.matched[part.chosen].1.swedish.clone().unwrap())
-                                    } else {
-                                        ui.label(&format!("{}?", part.matched[part.chosen].1.swedish.clone().unwrap()))
-                                    };
-                                    response.on_hover_ui_at_pointer(|ui| {
-                                        ui.label(format!("({}) {}", &part.matched[part.chosen].0, part.matched[part.chosen].1.tooltip()));
-                                    });
-                                }
-                            } else {
-                                for part in &self.result_explain {
-                                    let response = if part.sure {
-                                        ui.label(&part.matched[part.chosen].1.english.clone().unwrap())
-                                    } else {
-                                        ui.label(&format!("{}?", part.matched[part.chosen].1.english.clone().unwrap()))
-                                    };
-                                    response.on_hover_ui_at_pointer(|ui| {
-                                        ui.label(format!("({}) {}", &part.matched[part.chosen].0, part.matched[part.chosen].1.tooltip()));
-                                    });
-                                }
+                            for part in &self.result_explain {
+                                let text = if self.language == Language::Swedish {
+                                    part.matched[part.chosen].1.swedish.clone().unwrap()
+                                } else {
+                                    part.matched[part.chosen].1.english.clone().unwrap()
+                                };
+                                let response = if part.sure {
+                                    ui.label(&text)
+                                } else {
+                                    ui.label(&format!("{}?", text))
+                                };
+                                response.clone().on_hover_ui_at_pointer(|ui| {
+                                    ui.label(format!("({}) {}", &part.matched[part.chosen].0, part.matched[part.chosen].1.tooltip()));
+                                });
+                                response.context_menu(|ui| {
+                                    if ui.button("Details").clicked() {
+                                        ui.close_menu();
+                                        self.tab = Tab::Details(part.matched[part.chosen].1.to_owned());
+                                        self.popup = PopupWindow::None;
+                                    }
+                                    if ui.button("Edit").clicked() {
+                                        ui.close_menu();
+                                        self.popup = PopupWindow::AddWord(match part.matched[part.chosen].1.swedish.clone() {
+                                            None => "".to_string(),
+                                            Some(val) => val,
+                                        }, match part.matched[part.chosen].1.english.clone() {
+                                            None => "".to_string(),
+                                            Some(val) => val,
+                                        }, part.matched[part.chosen].1.category.clone(), "".to_string(), Some(self.search_words.get_item_index(&part.matched[part.chosen].1)));
+                                    }
+                                    if ui.button("Delete").clicked() {
+                                        ui.close_menu();
+                                        self.popup = PopupWindow::DeleteWord(self.search_words.get_item_index(&part.matched[part.chosen].1));
+                                    }
+                                });
                             }
                         });
                     });
                 }
             }
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                match self.tab {
-                    Tab::Practice(PracticeState::Wrong(_, _, _, _)) => {
-                        let response = ui.add_sized([ui.available_width(), 0.], egui::Button::new("Next question"));
+                let mut change_tab: Option<Tab> = None;
+                match &self.tab {
+                    Tab::Practice(PracticeState::Wrong(_, _, _, _, item)) => {
+                        let response = ui.add_sized([width, 0.], egui::Button::new("Next question"));
                         if self.popup == PopupWindow::None {
                             response.request_focus();
                         }
                         if response.clicked() {
-                            self.tab = Tab::Practice(PracticeState::Question(get_practice_question(&self.search_words)));
+                            change_tab = Some(Tab::Practice(PracticeState::Question(get_practice_question(&self.search_words))));
                             self.query_string.clear();
+                        }
+                        ui.add_space(ui.spacing().item_spacing.y);
+                        if ui.add_sized([width, 0.], egui::Button::new("Details")).clicked() {
+                            change_tab = Some(Tab::Details(item.to_owned()));
+                            self.popup = PopupWindow::None;
                         }
                     }
                     Tab::Practice(PracticeState::Question(_)) => {
-                        let response = ui.add_sized([ui.available_width(), 0.], egui::TextEdit::singleline(&mut self.query_string));
+                        let response = ui.add_sized([width, 0.], egui::TextEdit::singleline(&mut self.query_string));
                         if response.changed() {
                             self.gen_results();
                         }
@@ -603,8 +897,24 @@ impl eframe::App for App {
                             }
                         });
                     }
+                    Tab::Details(item) => {
+                        ui.with_layout(egui::Layout::left_to_right(egui::Align::BOTTOM), |ui| {
+                            if ui.button("Edit").clicked() {
+                                self.popup = PopupWindow::AddWord(match item.swedish.clone() {
+                                    None => "".to_string(),
+                                    Some(val) => val,
+                                }, match item.english.clone() {
+                                    None => "".to_string(),
+                                    Some(val) => val,
+                                }, item.category.clone(), "".to_string(), Some(self.search_words.get_item_index(item)));
+                            }
+                            if ui.button("Delete").clicked() {
+                                self.popup = PopupWindow::DeleteWord(self.search_words.get_item_index(item));
+                            }
+                        });
+                    }
                     _ => {
-                        let response = ui.add_sized([ui.available_width(), 0.], egui::TextEdit::singleline(&mut self.query_string));
+                        let response = ui.add_sized([width, 0.], egui::TextEdit::singleline(&mut self.query_string));
                         if response.changed() {
                             self.gen_results();
                         }
@@ -613,11 +923,15 @@ impl eframe::App for App {
                         }
                     }
                 }
+                if let Some(tab) = change_tab {
+                    self.tab = tab;
+                }
             });
         });
 
         let mut close = false;
         let mut reload = false;
+        let mut change_tab: Option<Tab> = None;
         match &mut self.popup {
             PopupWindow::None => {}
             PopupWindow::AddWord(swedish, english, ref mut category, any_verb, edit) => {
@@ -1201,6 +1515,9 @@ impl eframe::App for App {
                             self.search_words.remove_item(*index);
                             self.search_words.save(&self.search_words_file);
                             reload = true;
+                            if let Tab::Details(_) = self.tab {
+                                change_tab = Some(Tab::Words);
+                            }
                         }
                         if ui.button("Cancel").clicked() {
                             close = true;
@@ -1229,6 +1546,12 @@ impl eframe::App for App {
             self.popup = PopupWindow::None;
         }
         if reload {
+            self.gen_results();
+        }
+        if let Some(tab) = change_tab {
+            self.tab = tab;
+            self.results_search.clear();
+            self.query_string.clear();
             self.gen_results();
         }
     }
