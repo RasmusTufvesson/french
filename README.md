@@ -4,4 +4,3 @@ This is a small program i made to have some fun and improve my french. You can s
 ## Todo
 * Add filter option to practice
 * Make words you know not appear multiple times in practice
-* Make practice work with the new word classes
