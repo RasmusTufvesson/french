@@ -2,7 +2,7 @@ use std::{fmt::Display, fs::File, io::{Write, Read}};
 use levenshtein::levenshtein;
 use serde::{Serialize, Deserialize};
 use bincode::{serialize, deserialize};
-use rand::{seq::SliceRandom, thread_rng, distributions::{Distribution, Standard}, Rng};
+use rand::{distributions::{Distribution, Standard}, Rng};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Gender {
@@ -609,8 +609,8 @@ impl Search {
         self.items.remove(item);
     }
 
-    pub fn random_item(&self) -> Item {
-        self.items.choose(&mut thread_rng()).unwrap().clone()
+    pub fn get_item(&self, index: usize) -> Item {
+        self.items[index].clone()
     }
 
     // pub fn from_old(old: SearchOld) -> Self {

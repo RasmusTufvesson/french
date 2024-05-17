@@ -1,7 +1,8 @@
-use std::fmt::Display;
-
+use std::{fmt::Display, fs::File, io::{Read, Write}};
 use crate::search::{Adjective, Category, Item, Language, Pronoun, Search, VerbForms};
-use rand::{thread_rng, Rng};
+use bincode::{deserialize, serialize};
+use rand::{thread_rng, Rng, seq::SliceRandom};
+use serde::{Deserialize, Serialize};
 
 enum Form {
     Male,
@@ -59,6 +60,7 @@ impl Question {
             Language::English => unreachable!(),
         }
     }
+
     fn translate_number(french: String, num: String, to_language: Language, item: Item) -> Self {
         match to_language {
             Language::French => Self { string: format!("What is '{}' in french?", num), answer: french, language: to_language, item },
@@ -66,10 +68,17 @@ impl Question {
             Language::English => unreachable!(),
         }
     }
+
+    fn translate_plural(french: String, swedish: String, to_language: Language, item: Item) -> Self {
+        match to_language {
+            Language::French => Self { string: format!("What is '{}' in french plural?", swedish), answer: french, language: to_language, item },
+            Language::Swedish => Self { string: format!("What is '{}' (plural) in swedish?", french), answer: swedish, language: to_language, item },
+            Language::English => unreachable!(),
+        }
+    }
 }
 
-pub fn get_practice_question(search: &Search) -> Question {
-    let item = search.random_item();
+fn generate_practice_question(item: Item) -> Question {
     let to_language = thread_rng().gen::<Language>();
     match item.category {
         Category::Other(ref s) |
@@ -94,7 +103,7 @@ pub fn get_practice_question(search: &Search) -> Question {
         Category::Noun(ref s, _, ref plural) => {
             match thread_rng().gen_range(0..=1) {
                 0 => Question::translate(s.clone(), item.swedish.clone().unwrap(), to_language, item),
-                _ => Question::translate(plural.clone(), item.swedish.clone().unwrap(), to_language, item),
+                _ => Question::translate_plural(plural.clone(), item.swedish.clone().unwrap(), to_language, item),
             }
             
         }
@@ -137,5 +146,136 @@ pub fn get_practice_question(search: &Search) -> Question {
                 Pronoun::Indefinite(s, _) => Question::translate_adjective(s.clone(), item.swedish.clone().unwrap(), to_language, item),
             }
         }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub enum QuestionTemplate {
+    Word(usize),
+    Sentence(usize),
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PracticeGroup {
+    pub name: String,
+    pub questions: Vec<QuestionTemplate>,
+}
+
+impl PracticeGroup {
+    pub fn new(name: String) -> Self {
+        Self { name, questions: vec![] }
+    }
+
+    pub fn new_with_questions(name: String, questions: Vec<QuestionTemplate>) -> Self {
+        Self { name, questions }
+    }
+}
+
+#[derive(Debug)]
+pub struct Practice {
+    templates: Vec<QuestionTemplate>,
+    questions: Vec<usize>,
+    question: usize,
+    question_index: usize,
+    to_repeat: Vec<usize>,
+    answers: Vec<bool>,
+    continuing: bool,
+}
+
+impl Practice {
+    pub fn get_question(&mut self, words: &Search, sentences: &Search) -> Question {
+        let mut rng = thread_rng();
+        self.question += 1;
+        if self.question == self.questions.len() {
+            self.question = 0;
+            self.questions.shuffle(&mut rng);
+        }
+        if self.to_repeat.len() != 0 && rng.gen_bool(0.3) {
+            self.question -= 1;
+            let to_repeat_index = rng.gen_range(0..self.to_repeat.len());
+            self.question_index = self.to_repeat.swap_remove(to_repeat_index);
+        } else {
+            self.question_index = self.questions[self.question];
+        }
+        self.gen_question(words, sentences)
+    }
+
+    fn gen_question(&self, words: &Search, sentences: &Search) -> Question {
+        match self.templates[self.question_index] {
+            QuestionTemplate::Sentence(index) => {
+                generate_practice_question(sentences.get_item(index))
+            }
+            QuestionTemplate::Word(index) => {
+                generate_practice_question(words.get_item(index))
+            }
+        }
+    }
+
+    pub fn answer(&mut self, answer: bool) -> bool {
+        self.answers[self.question_index] = answer;
+        if !answer {
+            self.to_repeat.push(self.question_index);
+            false
+        } else if !self.continuing && self.answers.iter().all(|x| *x) {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn continue_practice(&mut self) {
+        self.continuing = true;
+    }
+
+    pub fn new() -> Self {
+        Self { templates: vec![], questions: vec![], question: 0, question_index: 0, to_repeat: vec![], answers: vec![], continuing: false }
+    }
+
+    pub fn init(&mut self, group: &PracticeGroup) {
+        self.templates = group.questions.clone();
+        self.questions = (0..group.questions.len()).collect();
+        self.questions.shuffle(&mut thread_rng());
+        self.question = 0;
+        self.question_index = 0;
+        self.to_repeat = vec![];
+        self.answers = vec![false; group.questions.len()];
+        self.continuing = false;
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PracticeGroupCollection {
+    pub groups: Vec<PracticeGroup>,
+}
+
+impl PracticeGroupCollection {
+    pub fn save(&self, file: &str) {
+        let serialized_data = serialize(self).unwrap();
+        let mut file = File::create(file).unwrap();
+        file.write_all(&serialized_data).unwrap();
+    }
+
+    pub fn load_or_new(file: &str) -> Self {
+        match File::open(file) {
+            Ok(mut file) => {
+                let mut serialized_data = Vec::new();
+                file.read_to_end(&mut serialized_data).unwrap();
+                let data: Self = deserialize(&serialized_data).unwrap();
+                data
+            }
+            Err(_) => {
+                Self {
+                    groups: vec![],
+                }
+            }
+        }
+    }
+
+    pub fn add_group(&mut self, group: PracticeGroup) {
+        self.groups.push(group);
+    }
+
+    pub fn remove_group(&mut self, index: usize) {
+        let _ = self.groups.remove(index);
     }
 }

@@ -2,12 +2,13 @@
 
 use eframe::{self, egui};
 use levenshtein::levenshtein;
-use crate::{explain::{explain, Part}, practice::{get_practice_question, Question}, search::{Adjective, Category, Gender, Item, Language, Pronoun, Query, Search, VerbForms}, utils};
+use crate::{explain::{explain, Part}, practice::{Practice, PracticeGroup, PracticeGroupCollection, Question, QuestionTemplate}, search::{Adjective, Category, Gender, Item, Language, Pronoun, Query, Search, VerbForms}, utils};
 
 #[derive(PartialEq)]
 enum PracticeState {
     Wrong(String, String, String, usize, Item),
     Question(Question),
+    AskContinue,
 }
 
 #[derive(PartialEq)]
@@ -17,6 +18,7 @@ enum Tab {
     Details(Item),
     Practice(PracticeState),
     Explain,
+    PracticeSelect,
 }
 
 #[derive(PartialEq)]
@@ -26,6 +28,8 @@ enum PopupWindow {
     AddSentence(String, String, String, Option<usize>),
     DeleteWord(usize),
     DeleteSentence(usize),
+    NewGroup(String, Option<usize>),
+    DeleteGroup(usize),
 }
 
 struct SearchCategories {
@@ -103,10 +107,13 @@ pub struct App {
     categories: SearchCategories,
     min_num_answers: usize,
     result_explain: Vec<Part>,
+    practice: Practice,
+    practice_groups: PracticeGroupCollection,
+    practice_groups_file: String,
 }
 
 impl App {
-    pub fn new(_cc: &eframe::CreationContext<'_>, search_words: Search, search_sentences: Search, search_words_file: String, search_sentences_file: String) -> Self {
+    pub fn new(_cc: &eframe::CreationContext<'_>, search_words: Search, search_sentences: Search, practice_groups: PracticeGroupCollection, search_words_file: String, search_sentences_file: String, practice_file: String) -> Self {
         let app = Self {
             search_words,
             search_sentences,
@@ -121,6 +128,10 @@ impl App {
             categories: SearchCategories::new(),
             min_num_answers: 0,
             result_explain: vec![],
+            practice: Practice::new(),
+            practice_groups,
+            practice_groups_file: practice_file,
+
         };
         app
     }
@@ -150,9 +161,14 @@ impl App {
             Tab::Practice(ref mut state) => {
                 if let PracticeState::Question(question) = state {
                     if self.query_string == question.answer {
-                        *state = PracticeState::Question(get_practice_question(&self.search_words));
                         self.query_string.clear();
+                        if self.practice.answer(true) {
+                            *state = PracticeState::AskContinue;
+                        } else {
+                            *state = PracticeState::Question(self.practice.get_question(&self.search_words, &self.search_sentences));
+                        }
                     } else {
+                        let _ = self.practice.answer(false);
                         *state = PracticeState::Wrong(question.string.clone(), question.answer.clone(), self.query_string.clone(), levenshtein(&question.answer, &self.query_string), question.item.clone());
                     }
                 }
@@ -182,7 +198,7 @@ impl eframe::App for App {
                     self.gen_results();
                 }
                 if ui.button("Practice").clicked() {
-                    self.tab = Tab::Practice(PracticeState::Question(get_practice_question(&self.search_words)));
+                    self.tab = Tab::PracticeSelect;
                     self.query_string.clear();
                     self.popup = PopupWindow::None;
                 }
@@ -253,6 +269,11 @@ impl eframe::App for App {
                                 }
                             );
                             ui.separator();
+                        }
+                        Tab::PracticeSelect => {
+                            if ui.button("New group").clicked() {
+                                self.popup = PopupWindow::NewGroup("".to_string(), None);
+                            }
                         }
                     }
                 });
@@ -613,7 +634,8 @@ impl eframe::App for App {
                         });
                 }
                 Tab::Words |
-                Tab::Sentences => {
+                Tab::Sentences |
+                Tab::PracticeSelect => {
                     ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
                         match self.tab {
                             Tab::Words => {
@@ -638,6 +660,16 @@ impl eframe::App for App {
                                             self.tab = Tab::Details(item.to_owned());
                                             self.popup = PopupWindow::None;
                                         }
+                                        ui.menu_button("Add to practice group", |ui| {
+                                            for group in &mut self.practice_groups.groups {
+                                                if ui.button(&group.name).clicked() {
+                                                    ui.close_menu();
+                                                    group.questions.push(QuestionTemplate::Word(self.search_words.get_item_index(item)));
+                                                    self.practice_groups.save(&self.practice_groups_file);
+                                                    break;
+                                                }
+                                            }
+                                        });
                                         if ui.button("Edit").clicked() {
                                             ui.close_menu();
                                             self.popup = PopupWindow::AddWord(match item.swedish.clone() {
@@ -682,6 +714,16 @@ impl eframe::App for App {
                                             }
                                             update_results = true;
                                         }
+                                        ui.menu_button("Add to practice group", |ui| {
+                                            for group in &mut self.practice_groups.groups {
+                                                if ui.button(&group.name).clicked() {
+                                                    ui.close_menu();
+                                                    group.questions.push(QuestionTemplate::Sentence(self.search_sentences.get_item_index(item)));
+                                                    self.practice_groups.save(&self.practice_groups_file);
+                                                    break;
+                                                }
+                                            }
+                                        });
                                         if ui.button("Edit").clicked() {
                                             ui.close_menu();
                                             self.popup = PopupWindow::AddSentence(match &item.category {
@@ -705,6 +747,27 @@ impl eframe::App for App {
                                     self.gen_results();
                                 }
                             }
+                            Tab::PracticeSelect => {
+                                for (i, group) in self.practice_groups.groups.iter().enumerate() {
+                                    let response = ui.button(&group.name);
+                                    response.clone().context_menu(|ui| {
+                                        if ui.button("Edit").clicked() {
+                                            ui.close_menu();
+                                            self.popup = PopupWindow::NewGroup(group.name.clone(), Some(i));
+                                        }
+                                        if ui.button("Delete").clicked() {
+                                            ui.close_menu();
+                                            self.popup = PopupWindow::DeleteGroup(i);
+                                        }
+                                    });
+                                    if response.clicked() {
+                                        self.practice.init(&self.practice_groups.groups[i]);
+                                        self.tab = Tab::Practice(PracticeState::Question(self.practice.get_question(&self.search_words, &self.search_sentences)));
+                                        self.query_string.clear();
+                                        self.popup = PopupWindow::None;
+                                    }
+                                }
+                            }
                             _ => {}
                         }
                     });
@@ -725,6 +788,9 @@ impl eframe::App for App {
                                 } else {
                                     ui.label("You need to practice this more.");
                                 }
+                            }
+                            PracticeState::AskContinue => {
+                                ui.heading("You know all of the words, continue anyway?");
                             }
                         }
                     });
@@ -849,7 +915,7 @@ impl eframe::App for App {
                             response.request_focus();
                         }
                         if response.clicked() {
-                            change_tab = Some(Tab::Practice(PracticeState::Question(get_practice_question(&self.search_words))));
+                            change_tab = Some(Tab::Practice(PracticeState::Question(self.practice.get_question(&self.search_words, &self.search_sentences))));
                             self.query_string.clear();
                         }
                         ui.add_space(ui.spacing().item_spacing.y);
@@ -897,6 +963,17 @@ impl eframe::App for App {
                             }
                         });
                     }
+                    Tab::Practice(PracticeState::AskContinue) => {
+                        let response = ui.add_sized([width, 0.], egui::Button::new("Continue"));
+                        if self.popup == PopupWindow::None {
+                            response.request_focus();
+                        }
+                        if response.clicked() {
+                            self.practice.continue_practice();
+                            change_tab = Some(Tab::Practice(PracticeState::Question(self.practice.get_question(&self.search_words, &self.search_sentences))));
+                            self.query_string.clear();
+                        }
+                    }
                     Tab::Details(item) => {
                         ui.with_layout(egui::Layout::left_to_right(egui::Align::BOTTOM), |ui| {
                             if ui.button("Edit").clicked() {
@@ -912,6 +989,9 @@ impl eframe::App for App {
                                 self.popup = PopupWindow::DeleteWord(self.search_words.get_item_index(item));
                             }
                         });
+                    }
+                    Tab::PracticeSelect => {
+
                     }
                     _ => {
                         let response = ui.add_sized([width, 0.], egui::TextEdit::singleline(&mut self.query_string));
@@ -963,7 +1043,9 @@ impl eframe::App for App {
                     match category {
                         Category::Noun(string, gender, plural) => {
                             ui.horizontal(|ui| {
-                                ui.add(egui::TextEdit::singleline(string));
+                                if ui.add(egui::TextEdit::singleline(string)).changed() {
+                                    *plural = string.clone() + "s";
+                                }
                                 ui.label("French Singular");
                             });
                             ui.horizontal(|ui| {
@@ -1541,6 +1623,51 @@ impl eframe::App for App {
                     });
                 });
             }
+            PopupWindow::NewGroup(name, index) => {
+                egui::Window::new("New group").collapsible(false).show(ctx, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.add(egui::TextEdit::singleline(name));
+                        ui.label("Name");
+                    });
+                    ui.horizontal(|ui| {
+                        match index {
+                            None => {
+                                if ui.button("Add").clicked() {
+                                    close = true;
+                                    self.practice_groups.add_group(PracticeGroup::new(name.clone()));
+                                    self.practice_groups.save(&self.practice_groups_file);
+                                }
+                            }
+                            Some(index) => {
+                                if ui.button("Apply").clicked() {
+                                    close = true;
+                                    let group = self.practice_groups.groups.remove(*index);
+                                    self.practice_groups.add_group(PracticeGroup::new_with_questions(name.clone(), group.questions));
+                                    self.practice_groups.save(&self.practice_groups_file);
+                                }
+                            }
+                        }
+                        if ui.button("Cancel").clicked() {
+                            close = true;
+                        }
+                    });
+                });
+            }
+            PopupWindow::DeleteGroup(index) => {
+                egui::Window::new("Delete group").collapsible(false).show(ctx, |ui| {
+                    ui.label("Are you sure?");
+                    ui.horizontal(|ui| {
+                        if ui.button("Delete").clicked() {
+                            close = true;
+                            self.practice_groups.remove_group(*index);
+                            self.practice_groups.save(&self.practice_groups_file);
+                        }
+                        if ui.button("Cancel").clicked() {
+                            close = true;
+                        }
+                    });
+                });
+            }
         }
         if close {
             self.popup = PopupWindow::None;
@@ -1557,11 +1684,11 @@ impl eframe::App for App {
     }
 }
 
-pub fn run(search_words: Search, search_sentences: Search, search_words_file: String, search_sentences_file: String) -> eframe::Result<()> {
+pub fn run(search_words: Search, search_sentences: Search, practice_groups: PracticeGroupCollection, search_words_file: String, search_sentences_file: String, practice_file: String) -> eframe::Result<()> {
     let native_options = eframe::NativeOptions::default();
     eframe::run_native(
         "French",
         native_options,
-        Box::new(|cc| Box::new(App::new(cc, search_words, search_sentences, search_words_file, search_sentences_file))),
+        Box::new(|cc| Box::new(App::new(cc, search_words, search_sentences, practice_groups, search_words_file, search_sentences_file, practice_file))),
     )
 }
