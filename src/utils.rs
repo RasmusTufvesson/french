@@ -1,4 +1,4 @@
-pub fn get_plural(string: &str) -> String {
+pub fn get_adjective_plural(string: &str) -> String {
     if string.ends_with("al") || string.ends_with("au") {
         string[0..string.len()-2].to_string() + "aux"
     } else if string.ends_with("ail") {

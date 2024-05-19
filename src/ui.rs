@@ -1170,11 +1170,15 @@ impl eframe::App for App {
                                 Adjective::Present(male, female, plural_male, plural_female) |
                                 Adjective::Relative(male, female, plural_male, plural_female) => {
                                     ui.horizontal(|ui| {
-                                        ui.add(egui::TextEdit::singleline(male));
+                                        if ui.add(egui::TextEdit::singleline(male)).changed() {
+                                            *plural_male = utils::get_adjective_plural(male);
+                                        }
                                         ui.label("Singular male");
                                     });
                                     ui.horizontal(|ui| {
-                                        ui.add(egui::TextEdit::singleline(female));
+                                        if ui.add(egui::TextEdit::singleline(female)).changed() {
+                                            *plural_female = utils::get_adjective_plural(female);
+                                        }
                                         ui.label("Singular female");
                                     });
                                     ui.horizontal(|ui| {
@@ -1188,7 +1192,9 @@ impl eframe::App for App {
                                 }
                                 Adjective::Demonstrative(singular, plural) => {
                                     ui.horizontal(|ui| {
-                                        ui.add(egui::TextEdit::singleline(singular));
+                                        if ui.add(egui::TextEdit::singleline(singular)).changed() {
+                                            *plural = utils::get_adjective_plural(singular);
+                                        }
                                         ui.label("Singular");
                                     });
                                     ui.horizontal(|ui| {
