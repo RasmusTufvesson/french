@@ -108,7 +108,7 @@ fn generate_practice_question(item: Item) -> Question {
             
         }
         Category::Verb(_, ref forms) => {
-            let (VerbForms::Regular(je, tu, il, nous, vous, ils) | VerbForms::Irregular(je, tu, il, nous, vous, ils)) = forms.clone();
+            let (VerbForms::Regular(je, tu, il, nous, vous, ils, pc, imp_je, imp_tu, imp_il, imp_nous, imp_vous, imp_ils) | VerbForms::Irregular(je, tu, il, nous, vous, ils, pc, imp_je, imp_tu, imp_il, imp_nous, imp_vous, imp_ils)) = forms.clone();
             match thread_rng().gen_range(0..=5) {
                 0 => Question::translate_verb(je, item.swedish.clone().unwrap(), "je", to_language, item),
                 1 => Question::translate_verb(tu, item.swedish.clone().unwrap(), "tu", to_language, item),

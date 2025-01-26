@@ -2,7 +2,7 @@ use std::{fmt::Display, fs::File, io::{Write, Read}};
 use levenshtein::levenshtein;
 use serde::{Serialize, Deserialize};
 use bincode::{serialize, deserialize};
-use rand::{distributions::{Distribution, Standard}, Rng};
+use rand::{distributions::{Distribution, Standard}, rngs::ThreadRng, seq::SliceRandom, Rng};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Gender {
@@ -21,9 +21,16 @@ impl Display for Gender {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum VerbForms {
-    Regular(String, String, String, String, String, String),
-    Irregular(String, String, String, String, String, String),
+    //        je,     tu,     il,     nous,   vous,   ils,    passe composé, imp je, imp tu, imp il, imp nous, imp vous, imp ils
+    Regular(  String, String, String, String, String, String, String,        String, String, String, String,   String,   String),
+    Irregular(String, String, String, String, String, String, String,        String, String, String, String,   String,   String),
 }
+
+// #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// pub enum VerbFormsOld {
+//     Regular(  String, String, String, String, String, String),
+//     Irregular(String, String, String, String, String, String),
+// }
 
 impl Display for VerbForms {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -41,7 +48,7 @@ enum RegularVerbType {
 }
 
 impl VerbForms {
-    pub fn gen_from_regular(string: &str) -> (String, String, String, String, String, String) {
+    pub fn gen_from_regular(string: &str) -> (String, String, String, String, String, String, String, String, String, String, String, String, String) {
         let (base, regular_verb_type) = if string.ends_with("issons") || string.ends_with("issent") {
             (&string[0..string.len()-6], RegularVerbType::Ir)
         } else if string.ends_with("issez") {
@@ -63,16 +70,28 @@ impl VerbForms {
         };
         match regular_verb_type {
             RegularVerbType::Er => {
-                (base.to_string()+"e", base.to_string()+"es", base.to_string()+"e", base.to_string()+"ons", base.to_string()+"ez", base.to_string()+"ent")
+                (base.to_string()+"e", base.to_string()+"es", base.to_string()+"e", base.to_string()+"ons", base.to_string()+"ez", base.to_string()+"ent", base.to_string()+"é", base.to_string()+"ais", base.to_string()+"ais", base.to_string()+"ait", base.to_string()+"ions", base.to_string()+"iez", base.to_string()+"aient")
             }
             RegularVerbType::Ir => {
-                (base.to_string()+"is", base.to_string()+"is", base.to_string()+"it", base.to_string()+"issons", base.to_string()+"issez", base.to_string()+"issent")
+                (base.to_string()+"is", base.to_string()+"is", base.to_string()+"it", base.to_string()+"issons", base.to_string()+"issez", base.to_string()+"issent", base.to_string()+"i", base.to_string()+"issais", base.to_string()+"issais", base.to_string()+"issait", base.to_string()+"issions", base.to_string()+"issiez", base.to_string()+"issaient")
             }
             RegularVerbType::Re => {
-                (base.to_string()+"s", base.to_string()+"s", base.to_string(), base.to_string()+"ons", base.to_string()+"ez", base.to_string()+"ent")
+                (base.to_string()+"s", base.to_string()+"s", base.to_string(), base.to_string()+"ons", base.to_string()+"ez", base.to_string()+"ent", base.to_string()+"u", base.to_string()+"ais", base.to_string()+"ais", base.to_string()+"ait", base.to_string()+"ions", base.to_string()+"iez", base.to_string()+"aient")
             }
         }
     }
+
+    // fn from_old(old: VerbFormsOld) -> Self {
+    //     match old {
+    //         VerbFormsOld::Regular(je, tu, il, nous, vous, ils) => {
+    //             let base = &je[..je.len()-1];
+    //             Self::Regular(je.clone(), tu, il, nous, vous, ils, base.to_string()+"é", base.to_string()+"ais", base.to_string()+"ais", base.to_string()+"ait", base.to_string()+"ions", base.to_string()+"iez", base.to_string()+"aient")
+    //         }
+    //         VerbFormsOld::Irregular(je, tu, il, nous, vous, ils) => {
+    //             Self::Irregular(je, tu, il, nous, vous, ils, "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string())
+    //         }
+    //     }
+    // }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -153,8 +172,8 @@ pub enum Category {
 // #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 // pub enum CategoryOld {
 //     Noun(String, Gender, String),
-//     Verb(String, VerbForms),
-//     Adjective(String, String, String, String),
+//     Verb(String, VerbFormsOld),
+//     Adjective(Adjective),
 //     Article(String, String, String, Option<String>),
 //     Conjunction(String),
 //     Pronoun(Pronoun),
@@ -292,7 +311,7 @@ impl Category {
 
     // fn from_old(old: CategoryOld) -> Self {
     //     match old {
-    //         CategoryOld::Adjective(a, b, c, d) => Self::Adjective(Adjective::Indefinite(a, b, c, d)),
+    //         CategoryOld::Adjective(a) => Self::Adjective(a),
     //         CategoryOld::Article(a, b, c, d) => Self::Article(a, b, c, d),
     //         CategoryOld::Adverb(a) => Self::Adverb(a),
     //         CategoryOld::Conjunction(a) => Self::Conjunction(a),
@@ -301,7 +320,7 @@ impl Category {
     //         CategoryOld::Other(a) => Self::Other(a),
     //         CategoryOld::Preposition(a) => Self::Preposition(a),
     //         CategoryOld::Pronoun(a) => Self::Pronoun(a),
-    //         CategoryOld::Verb(a, b) => Self::Verb(a, b),
+    //         CategoryOld::Verb(a, b) => Self::Verb(a, VerbForms::from_old(b)),
     //         CategoryOld::Number(a, b, c, d, e, f, g, h) => Self::Number(a, b, c, d, e, f, g, h),
     //     }
     // }
@@ -367,8 +386,8 @@ impl Item {
                     Category::Noun(string, _, plural) => Some(vec![string, plural]),
                     Category::Verb(base, form) => {
                         match form {
-                            VerbForms::Regular(je, tu, _, nous, vous, ils) => Some(vec![je, tu, nous, vous, ils, base]),
-                            VerbForms::Irregular(je, tu, il, nous, vous, ils) => Some(vec![je, tu, il, nous, vous, ils, base]),
+                            VerbForms::Regular(je, tu, _, nous, vous, ils, pc, imp_je, imp_tu, imp_il, imp_nous, imp_vous, imp_ils) => Some(vec![je, tu, nous, vous, ils, base, pc, imp_je, imp_tu, imp_il, imp_nous, imp_vous, imp_ils]),
+                            VerbForms::Irregular(je, tu, il, nous, vous, ils, pc, imp_je, imp_tu, imp_il, imp_nous, imp_vous, imp_ils) => Some(vec![je, tu, il, nous, vous, ils, base, pc, imp_je, imp_tu, imp_il, imp_nous, imp_vous, imp_ils]),
                         }
                     }
                     Category::Adverb(string) => Some(vec![string]),
@@ -450,6 +469,63 @@ impl Item {
         }
     }
 
+    pub fn language_string(&self, language: &Language) -> Option<&String> {
+        match language {
+            Language::French => {
+                match &self.category {
+                    Category::Adjective(adjective) => {
+                        match adjective {
+                            Adjective::Demonstrative(a, _) |
+                            Adjective::Negative(a, _) |
+                            Adjective::ExclamativeInterrogative(a, ..) |
+                            Adjective::Indefinite(a, ..) |
+                            Adjective::Past(a, ..) |
+                            Adjective::Present(a, ..) |
+                            Adjective::Relative(a, ..) |
+                            Adjective::Possessive(a, ..) => Some(a),
+                        }
+                    }
+                    Category::Number(string, ..) |
+                    Category::Other(string) |
+                    Category::Noun(string, _, _) |
+                    Category::Verb(string, _) |
+                    Category::Adverb(string) |
+                    Category::Conjunction(string) |
+                    Category::Interjection(string) |
+                    Category::Preposition(string) |
+                    Category::Article(string, ..) => Some(string),
+                    Category::Pronoun(pronoun) => {
+                        match pronoun {
+                            Pronoun::Adverbial(string) |
+                            Pronoun::ImpersonalSubject(string) |
+                            Pronoun::IndefiniteDemonstrative(string) |
+                            Pronoun::IndefiniteRelative(string) |
+                            Pronoun::Interrogative(string) |
+                            Pronoun::Negative(string) |
+                            Pronoun::Demonstrative(string, ..) |
+                            Pronoun::Indefinite(string, _) |
+                            Pronoun::Personal(string, ..) |
+                            Pronoun::Possessive(string, ..) |
+                            Pronoun::Relative(string, _) => Some(string),
+                        }
+                    }
+                }
+            }
+            Language::Swedish => {
+                match &self.swedish {
+                    None => None,
+                    Some(string) => Some(string),
+                }
+            }
+            Language::English => {
+                match &self.english {
+                    None => None,
+                    Some(string) => Some(string),
+                }
+            }
+        }
+    }
+
     pub fn tooltip(&self) -> String {
         self.category.display_detailed(&self.english, &self.swedish)
     }
@@ -496,14 +572,15 @@ impl Distribution<Language> for Standard {
 }
 
 pub struct Query<'a> {
-    string: &'a String,
-    language: &'a Language,
-    search_categories_int: u16,
+    pub string: &'a String,
+    pub language: &'a Language,
+    pub search_categories_int: u16,
+    pub match_length: bool,
 }
 
 impl<'a> Query<'a> {
-    pub fn new(string: &'a String, language: &'a Language, search_categories_int: u16) -> Self {
-        Self { string, language, search_categories_int }
+    pub fn new(string: &'a String, language: &'a Language, search_categories_int: u16, match_length: bool) -> Self {
+        Self { string, language, search_categories_int, match_length }
     }
 }
 
@@ -518,20 +595,50 @@ pub struct Search {
 // }
 
 impl Search {
+    pub fn get_all(&self, query: &Query, num_answers: usize) -> Vec<(String, Item)> {
+        let mut matches = vec![];
+
+        'outer: for item in &self.items {
+            if let Some(string) = item.language_string(&query.language) {
+                if item.category_int & query.search_categories_int != 0 {
+                    matches.push((string, item.clone()));
+                    if matches.len() == num_answers {
+                        break 'outer;
+                    }
+                }
+            }
+        }
+
+        matches.iter().map(|(s, x)| (s.to_owned().to_owned(), x.to_owned())).collect()
+    }
+
+    pub fn all_items(&self, query: &Query) -> Vec<&Item> {
+        let mut matches = vec![];
+
+        for item in &self.items {
+            if item.category_int & query.search_categories_int != 0 {
+                matches.push(item);
+            }
+        }
+
+        matches
+    }
+
     pub fn search(&self, query: &Query, num_answers: usize) -> Vec<(String, Item)> {
         let mut best_matches: Vec<(&String, Item)> = Vec::with_capacity(num_answers);
         let mut best_match_scores: Vec<usize> = vec![usize::MAX; num_answers];
+        let length = query.string.len();
 
         for item in &self.items {
             if let Some(strings) = item.language_strings(&query.language) {
                 if item.category_int & query.search_categories_int != 0 {
                     for string in strings {
                         let list_item = (string, item.clone());
-                        if !best_matches.contains(&list_item) {
+                        if ((query.match_length && length == string.len()) || !query.match_length) && !best_matches.contains(&list_item) {
                             let distance = levenshtein(&query.string, &list_item.0);
                 
                             for i in 0..num_answers {
-                                if distance < best_match_scores[i] {
+                                if distance < best_match_scores[i] && distance < string.len() {
                                     best_match_scores.insert(i, distance);
                                     best_match_scores.truncate(num_answers);
                                     best_matches.insert(i, list_item.to_owned());
@@ -551,15 +658,16 @@ impl Search {
     pub fn search_best_answers(&self, query: &Query) -> (Vec<(String, Item)>, usize) {
         let mut best_matches: Vec<(&String, Item)> = vec![];
         let mut best_match_score: usize = usize::MAX;
+        let length = query.string.len();
 
         for item in &self.items {
             if let Some(strings) = item.language_strings(&query.language) {
                 if item.category_int & query.search_categories_int != 0 {
                     for string in strings {
                         let list_item = (string, item.clone());
-                        if !best_matches.contains(&list_item) {
+                        if ((query.match_length && length == string.len()) || !query.match_length) && !best_matches.contains(&list_item) {
                             let distance = levenshtein(&query.string, &list_item.0);
-                            if distance < best_match_score {
+                            if distance < best_match_score && distance < string.len() {
                                 best_match_score = distance;
                                 best_matches.clear();
                                 best_matches.push(list_item.to_owned());
@@ -613,9 +721,13 @@ impl Search {
         self.items[index].clone()
     }
 
+    pub fn random_item(&self, query: &Query, rng: &mut ThreadRng) -> Item {
+        (**self.all_items(query).choose(rng).unwrap()).clone()
+    }
+
     // pub fn from_old(old: SearchOld) -> Self {
     //     Self { items: old.items.iter().map(|x| Item::from_old(x.to_owned())).collect() }
-    // }    
+    // }
 }
 
 // impl SearchOld {

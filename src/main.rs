@@ -3,6 +3,7 @@ mod ui;
 mod practice;
 mod explain;
 mod utils;
+mod sentence;
 
 const WORDS_FILE: &str = "words.bin";
 const SENTENCES_FILE: &str = "sentences.bin";
