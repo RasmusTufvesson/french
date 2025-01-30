@@ -17,6 +17,8 @@ fn main() {
     
     // let engine_words = search::Search::from_old(search::SearchOld::load_or_new(WORDS_FILE));
     // let engine_sentences = search::Search::from_old(search::SearchOld::load_or_new(SENTENCES_FILE));
+    // let practice = practice::PracticeGroupCollection::from_old(practice::PracticeGroupCollectionOld::load_or_new(PRACTICE_FILE));
     // engine_words.save(WORDS_FILE);
     // engine_sentences.save(SENTENCES_FILE);
+    // practice.save(PRACTICE_FILE);
 }

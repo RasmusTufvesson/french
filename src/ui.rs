@@ -19,6 +19,7 @@ enum Tab {
     Practice(PracticeState),
     Explain,
     PracticeSelect,
+    PracticeView(usize),
     Example(Vec<(String, Item)>),
 }
 
@@ -223,7 +224,7 @@ impl eframe::App for App {
                     match self.tab {
                         Tab::Words => {
                             if ui.button("Add word").clicked() {
-                                self.popup = PopupWindow::AddWord("".to_string(), "".to_string(), Category::Other("".to_string()), "".to_string(), None);
+                                self.popup = PopupWindow::AddWord("".to_string(), "".to_string(), Category::Noun("".to_string(), Gender::Male, "".to_string()), "".to_string(), None);
                             }
                             ui.separator();
                             egui::ComboBox::from_id_source("Language")
@@ -261,7 +262,7 @@ impl eframe::App for App {
                             );
                             ui.separator();
                         }
-                        Tab::Details(_) | Tab::Practice(_) | Tab::Example(_) => {
+                        Tab::Details(_) | Tab::Practice(_) | Tab::Example(_) | Tab::PracticeView(_) => {
 
                         }
                         Tab::Explain => {
@@ -704,7 +705,7 @@ impl eframe::App for App {
                                             for group in &mut self.practice_groups.groups {
                                                 if ui.button(&group.name).clicked() {
                                                     ui.close_menu();
-                                                    group.questions.push(QuestionTemplate::Word(self.search_words.get_item_index(item)));
+                                                    group.questions.push(QuestionTemplate::Word(item.uid));
                                                     self.practice_groups.save(&self.practice_groups_file);
                                                     break;
                                                 }
@@ -755,7 +756,7 @@ impl eframe::App for App {
                                             for group in &mut self.practice_groups.groups {
                                                 if ui.button(&group.name).clicked() {
                                                     ui.close_menu();
-                                                    group.questions.push(QuestionTemplate::Sentence(self.search_sentences.get_item_index(item)));
+                                                    group.questions.push(QuestionTemplate::Sentence(item.uid));
                                                     self.practice_groups.save(&self.practice_groups_file);
                                                     break;
                                                 }
@@ -788,6 +789,10 @@ impl eframe::App for App {
                                 for (i, group) in self.practice_groups.groups.iter().enumerate() {
                                     let response = ui.button(&group.name);
                                     response.clone().context_menu(|ui| {
+                                        if ui.button("View").clicked() {
+                                            ui.close_menu();
+                                            self.tab = Tab::PracticeView(i);
+                                        }
                                         if ui.button("Edit").clicked() {
                                             ui.close_menu();
                                             self.popup = PopupWindow::NewGroup(group.name.clone(), Some(i));
@@ -848,6 +853,66 @@ impl eframe::App for App {
                             });
                         }
                     });
+                }
+                Tab::PracticeView(index) => {
+                    let mut to_details = None;
+                    egui::Grid::new("practice_view_grid")
+                        .num_columns(3)
+                        .spacing([40.0, 4.0])
+                        .striped(true)
+                        .min_col_width(width / 3.)
+                        .show(ui, |ui| {
+                            let group = &mut self.practice_groups.groups[*index];
+                            ui.label(&group.name);
+                            ui.end_row();
+                            
+                            let mut to_remove = vec![];
+                            for (i, question) in group.questions.iter().enumerate() {
+                                let (item, is_word) = match question {
+                                    QuestionTemplate::Word(uid) => {
+                                        (self.search_words.get_item_from_uid(*uid), true)
+                                    }
+                                    QuestionTemplate::Sentence(uid) => {
+                                        (self.search_sentences.get_item_from_uid(*uid), false)
+                                    }
+                                };
+                                if let Some(item) = item {
+                                    let unknown = "Unknown".to_string();
+                                    let french = item.language_string(&Language::French).unwrap_or(&unknown);
+                                    let response = ui.label(french).on_hover_ui_at_pointer(|ui| { ui.label(item.tooltip()); });
+                                    if is_word {
+                                        response.context_menu(|ui| {
+                                            if ui.button("Details").clicked() {
+                                                ui.close_menu();
+                                                to_details = Some(item.clone());
+                                            }
+                                            if ui.button("Remove").clicked() {
+                                                ui.close_menu();
+                                                to_remove.push(i);
+                                            }
+                                        });
+                                    } else {
+                                        response.context_menu(|ui| {
+                                            if ui.button("Details").clicked() {
+                                                ui.close_menu();
+                                                to_details = Some(item.clone());
+                                            }
+                                        });
+                                    }
+                                    ui.label(item.language_string(&Language::Swedish).unwrap_or(&unknown));
+                                    ui.label(item.language_string(&Language::English).unwrap_or(&unknown));
+                                } else {
+                                    ui.label("Deleted item");
+                                }
+                                ui.end_row();
+                            }
+                            for i in to_remove.iter().rev() {
+                                group.questions.remove(*i);
+                            }
+                        });
+                    if let Some(item) = to_details {
+                        self.tab = Tab::Details(item);
+                    }
                 }
                 Tab::Explain => {
                     ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
@@ -1668,7 +1733,8 @@ impl eframe::App for App {
                                     close = true;
                                     let swedish_val = if swedish.len() > 0 { Some(swedish.clone()) } else { None };
                                     let english_val = if english.len() > 0 { Some(english.clone()) } else { None };
-                                    self.search_words.add_item(Item::new(swedish_val, english_val, category.clone()));
+                                    let uid = self.search_words.next_uid();
+                                    self.search_words.add_item(Item::new(swedish_val, english_val, category.clone(), uid));
                                     self.search_words.save(&self.search_words_file);
                                     reload = true;
                                 }
@@ -1678,7 +1744,7 @@ impl eframe::App for App {
                                     close = true;
                                     let swedish_val = if swedish.len() > 0 { Some(swedish.clone()) } else { None };
                                     let english_val = if english.len() > 0 { Some(english.clone()) } else { None };
-                                    let item = Item::new(swedish_val, english_val, category.clone());
+                                    let item = Item::new(swedish_val, english_val, category.clone(), self.search_words.get_item(*index).uid);
                                     if self.tab == Tab::Details(self.search_words.get_item(*index)) {
                                         self.tab = Tab::Details(item.clone())
                                     }
@@ -1718,7 +1784,8 @@ impl eframe::App for App {
                                     close = true;
                                     let swedish_val = if swedish.len() > 0 { Some(swedish.clone()) } else { None };
                                     let english_val = if english.len() > 0 { Some(english.clone()) } else { None };
-                                    self.search_sentences.add_item(Item::new(swedish_val, english_val, Category::Other(french.clone())));
+                                    let uid = self.search_sentences.next_uid();
+                                    self.search_sentences.add_item(Item::new(swedish_val, english_val, Category::Other(french.clone()), uid));
                                     self.search_sentences.save(&self.search_sentences_file);
                                     reload = true;
                                 }
@@ -1729,7 +1796,7 @@ impl eframe::App for App {
                                     let swedish_val = if swedish.len() > 0 { Some(swedish.clone()) } else { None };
                                     let english_val = if english.len() > 0 { Some(english.clone()) } else { None };
                                     self.search_sentences.remove_item(*index);
-                                    self.search_sentences.add_item(Item::new(swedish_val, english_val, Category::Other(french.clone())));
+                                    self.search_sentences.add_item(Item::new(swedish_val, english_val, Category::Other(french.clone()), self.search_sentences.get_item(*index).uid));
                                     self.search_sentences.save(&self.search_sentences_file);
                                     reload = true;
                                 }

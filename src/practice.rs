@@ -150,17 +150,29 @@ fn generate_practice_question(item: Item) -> Question {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub enum QuestionTemplate {
-    Word(usize),
-    Sentence(usize),
+    Word(u32),
+    Sentence(u32),
 }
 
-#[derive(Serialize, Deserialize)]
+// #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+// pub enum QuestionTemplateOld {
+//     Word(usize),
+//     Sentence(usize),
+// }
+
+#[derive(Serialize, Deserialize, PartialEq, Clone)]
 pub struct PracticeGroup {
     pub name: String,
     pub questions: Vec<QuestionTemplate>,
 }
+
+// #[derive(Serialize, Deserialize, PartialEq, Clone)]
+// pub struct PracticeGroupOld {
+//     pub name: String,
+//     pub questions: Vec<QuestionTemplateOld>,
+// }
 
 impl PracticeGroup {
     pub fn new(name: String) -> Self {
@@ -170,6 +182,10 @@ impl PracticeGroup {
     pub fn new_with_questions(name: String, questions: Vec<QuestionTemplate>) -> Self {
         Self { name, questions }
     }
+
+    // pub fn from_old(old: PracticeGroupOld) -> Self {
+    //     Self { name: old.name, questions: vec![] }
+    // }
 }
 
 #[derive(Debug)]
@@ -203,11 +219,11 @@ impl Practice {
 
     fn gen_question(&self, words: &Search, sentences: &Search) -> Question {
         match self.templates[self.question_index] {
-            QuestionTemplate::Sentence(index) => {
-                generate_practice_question(sentences.get_item(index))
+            QuestionTemplate::Sentence(uid) => {
+                generate_practice_question(sentences.get_item_from_uid(uid).unwrap())
             }
-            QuestionTemplate::Word(index) => {
-                generate_practice_question(words.get_item(index))
+            QuestionTemplate::Word(uid) => {
+                generate_practice_question(words.get_item_from_uid(uid).unwrap())
             }
         }
     }
@@ -249,6 +265,11 @@ pub struct PracticeGroupCollection {
     pub groups: Vec<PracticeGroup>,
 }
 
+// #[derive(Serialize, Deserialize)]
+// pub struct PracticeGroupCollectionOld {
+//     pub groups: Vec<PracticeGroupOld>,
+// }
+
 impl PracticeGroupCollection {
     pub fn save(&self, file: &str) {
         let serialized_data = serialize(self).unwrap();
@@ -279,4 +300,26 @@ impl PracticeGroupCollection {
     pub fn remove_group(&mut self, index: usize) {
         let _ = self.groups.remove(index);
     }
+
+    // pub fn from_old(old: PracticeGroupCollectionOld) -> Self {
+    //     Self { groups: old.groups.iter().map(|g| PracticeGroup::from_old(g.clone())).collect() }
+    // }
 }
+
+// impl PracticeGroupCollectionOld {
+//     pub fn load_or_new(file: &str) -> Self {
+//         match File::open(file) {
+//             Ok(mut file) => {
+//                 let mut serialized_data = Vec::new();
+//                 file.read_to_end(&mut serialized_data).unwrap();
+//                 let data: Self = deserialize(&serialized_data).unwrap();
+//                 data
+//             }
+//             Err(_) => {
+//                 Self {
+//                     groups: vec![],
+//                 }
+//             }
+//         }
+//     }
+// }

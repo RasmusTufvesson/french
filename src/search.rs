@@ -380,20 +380,21 @@ pub struct Item {
     pub english: Option<String>,
     pub category: Category,
     category_int: u16,
+    pub uid: u32,
 }
 
 // #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 // pub struct ItemOld {
 //     pub swedish: Option<String>,
 //     pub english: Option<String>,
-//     pub category: CategoryOld,
+//     pub category: Category,
 //     category_int: u16,
 // }
 
 impl Item {
-    pub fn new(swedish: Option<String>, english: Option<String>, category: Category) -> Self {
+    pub fn new(swedish: Option<String>, english: Option<String>, category: Category, uid: u32) -> Self {
         let category_int = category.to_u16();
-        Self { swedish, english, category, category_int }
+        Self { swedish, english, category, category_int, uid }
     }
 
     fn language_strings(&self, language: &Language) -> Option<Vec<&String>> {
@@ -562,8 +563,8 @@ impl Item {
         self.category.display_detailed(&self.english, &self.swedish)
     }
 
-    // fn from_old(old: ItemOld) -> Self {
-    //     Self { swedish: old.swedish, english: old.english, category: Category::from_old(old.category), category_int: old.category_int }
+    // fn from_old(old: ItemOld, uid: u32) -> Self {
+    //     Self { swedish: old.swedish, english: old.english, category: old.category, category_int: old.category_int, uid }
     // }
 }
 
@@ -619,6 +620,7 @@ impl<'a> Query<'a> {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Search {
     items: Vec<Item>,
+    uid_counter: u32,
 }
 
 // #[derive(Debug, Serialize, Deserialize)]
@@ -736,6 +738,7 @@ impl Search {
             Err(_) => {
                 Self {
                     items: vec![],
+                    uid_counter: 0,
                 }
             }
         }
@@ -753,12 +756,33 @@ impl Search {
         self.items[index].clone()
     }
 
+    pub fn get_item_from_uid(&self, uid: u32) -> Option<Item> {
+        for item in &self.items {
+            if item.uid == uid {
+                return Some(item.clone());
+            }
+        }
+        None
+    }
+
     pub fn random_item(&self, query: &Query, rng: &mut ThreadRng) -> Item {
         (**self.all_items(query).choose(rng).unwrap()).clone()
     }
 
+    pub fn next_uid(&mut self) -> u32 {
+        let out = self.uid_counter;
+        self.uid_counter += 1;
+        out
+    }
+
     // pub fn from_old(old: SearchOld) -> Self {
-    //     Self { items: old.items.iter().map(|x| Item::from_old(x.to_owned())).collect() }
+    //     // Self { items: old.items.iter().map(|x| Item::from_old(x.to_owned())).collect() }
+    //     let mut uid_counter = 0;
+    //     println!("{:?}", old.items);
+    //     Self { items: old.items.iter().map(|i| {
+    //         uid_counter += 1;
+    //         Item::from_old(i.clone(), uid_counter - 1)
+    //     }).collect(), uid_counter }
     // }
 }
 
