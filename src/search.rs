@@ -129,6 +129,19 @@ impl Display for Pronoun {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Adjective {
+    Descriptive(String, String, String, String),
+    Demonstrative(String, String),
+    ExclamativeInterrogative(String, String, String, String),
+    Indefinite(String, String, String, String),
+    Negative(String, String),
+    Possessive(String, String, String),
+    Relative(String, String, String, String),
+    Past(String, String, String, String),
+    Present(String, String, String, String),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum AdjectiveOld {
     Demonstrative(String, String),
     ExclamativeInterrogative(String, String, String, String),
     Indefinite(String, String, String, String),
@@ -142,6 +155,7 @@ pub enum Adjective {
 impl Display for Adjective {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
+            Self::Descriptive(..) => "Descriptive",
             Self::Demonstrative(..) => "Demonstrative",
             Self::ExclamativeInterrogative(..) => "Exclamative and interrogative",
             Self::Indefinite(..) => "Indefinite",
@@ -151,6 +165,21 @@ impl Display for Adjective {
             Self::Present(..) => "Present participle",
             Self::Relative(..) => "Relative",
         })
+    }
+}
+
+impl Adjective {
+    fn from_old(old: AdjectiveOld) -> Self {
+        match old {
+            AdjectiveOld::Demonstrative(a, b) => Self::Demonstrative(a, b),
+            AdjectiveOld::ExclamativeInterrogative(a, b, c, d) => Self::ExclamativeInterrogative(a, b, c, d),
+            AdjectiveOld::Indefinite(a, b, c, d) => Adjective::Indefinite(a, b, c, d),
+            AdjectiveOld::Negative(a, b) => Adjective::Negative(a, b),
+            AdjectiveOld::Past(a, b, c, d) => Adjective::Past(a, b, c, d),
+            AdjectiveOld::Possessive(a, b, c) => Adjective::Possessive(a, b, c),
+            AdjectiveOld::Present(a, b, c, d) => Adjective::Present(a, b, c, d),
+            AdjectiveOld::Relative(a, b, c, d) => Adjective::Relative(a, b, c, d),
+        }
     }
 }
 
@@ -169,20 +198,20 @@ pub enum Category {
     Other(String),
 }
 
-// #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// pub enum CategoryOld {
-//     Noun(String, Gender, String),
-//     Verb(String, VerbFormsOld),
-//     Adjective(Adjective),
-//     Article(String, String, String, Option<String>),
-//     Conjunction(String),
-//     Pronoun(Pronoun),
-//     Preposition(String),
-//     Adverb(String),
-//     Interjection(String),
-//     Number(String, Option<String>, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>),
-//     Other(String),
-// }
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum CategoryOld {
+    Noun(String, Gender, String),
+    Verb(String, VerbForms),
+    Adjective(AdjectiveOld),
+    Article(String, String, String, Option<String>),
+    Conjunction(String),
+    Pronoun(Pronoun),
+    Preposition(String),
+    Adverb(String),
+    Interjection(String),
+    Number(String, Option<String>, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>),
+    Other(String),
+}
 
 impl Category {
     pub fn to_u16(&self) -> u16 {
@@ -226,6 +255,7 @@ impl Category {
             }
             Self::Adjective(adjective) => {
                 match adjective {
+                    Adjective::Descriptive(s_m, s_f, p_m, p_f) => format!("{}/{}/{}/{} ({}, {}), descriptive adjective", s_m, s_f, p_m, p_f, swedish, english),
                     Adjective::Demonstrative(singular, plural) => format!("{}/{} ({}, {}), demonstrative adjective", singular, plural, swedish, english),
                     Adjective::ExclamativeInterrogative(s_m, s_f, p_m, p_f) => format!("{}/{}/{}/{} ({}, {}), exclamative and interrogative adjective", s_m, s_f, p_m, p_f, swedish, english),
                     Adjective::Indefinite(s_m, s_f, p_m, p_f) => format!("{}/{}/{}/{} ({}, {}), indefinite adjective", s_m, s_f, p_m, p_f, swedish, english),
@@ -309,21 +339,21 @@ impl Category {
         }
     }
 
-    // fn from_old(old: CategoryOld) -> Self {
-    //     match old {
-    //         CategoryOld::Adjective(a) => Self::Adjective(a),
-    //         CategoryOld::Article(a, b, c, d) => Self::Article(a, b, c, d),
-    //         CategoryOld::Adverb(a) => Self::Adverb(a),
-    //         CategoryOld::Conjunction(a) => Self::Conjunction(a),
-    //         CategoryOld::Interjection(a) => Self::Interjection(a),
-    //         CategoryOld::Noun(a, b, c) => Self::Noun(a, b, c),
-    //         CategoryOld::Other(a) => Self::Other(a),
-    //         CategoryOld::Preposition(a) => Self::Preposition(a),
-    //         CategoryOld::Pronoun(a) => Self::Pronoun(a),
-    //         CategoryOld::Verb(a, b) => Self::Verb(a, VerbForms::from_old(b)),
-    //         CategoryOld::Number(a, b, c, d, e, f, g, h) => Self::Number(a, b, c, d, e, f, g, h),
-    //     }
-    // }
+    fn from_old(old: CategoryOld) -> Self {
+        match old {
+            CategoryOld::Adjective(a) => Self::Adjective(Adjective::from_old(a)),
+            CategoryOld::Article(a, b, c, d) => Self::Article(a, b, c, d),
+            CategoryOld::Adverb(a) => Self::Adverb(a),
+            CategoryOld::Conjunction(a) => Self::Conjunction(a),
+            CategoryOld::Interjection(a) => Self::Interjection(a),
+            CategoryOld::Noun(a, b, c) => Self::Noun(a, b, c),
+            CategoryOld::Other(a) => Self::Other(a),
+            CategoryOld::Preposition(a) => Self::Preposition(a),
+            CategoryOld::Pronoun(a) => Self::Pronoun(a),
+            CategoryOld::Verb(a, b) => Self::Verb(a, b),
+            CategoryOld::Number(a, b, c, d, e, f, g, h) => Self::Number(a, b, c, d, e, f, g, h),
+        }
+    }
 }
 
 impl Display for Category {
@@ -352,13 +382,13 @@ pub struct Item {
     category_int: u16,
 }
 
-// #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-// pub struct ItemOld {
-//     pub swedish: Option<String>,
-//     pub english: Option<String>,
-//     pub category: CategoryOld,
-//     category_int: u16,
-// }
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ItemOld {
+    pub swedish: Option<String>,
+    pub english: Option<String>,
+    pub category: CategoryOld,
+    category_int: u16,
+}
 
 impl Item {
     pub fn new(swedish: Option<String>, english: Option<String>, category: Category) -> Self {
@@ -375,6 +405,7 @@ impl Item {
                         match adjective {
                             Adjective::Demonstrative(a, b) |
                             Adjective::Negative(a, b) => Some(vec![a,b]),
+                            Adjective::Descriptive(a, b, c, d) |
                             Adjective::ExclamativeInterrogative(a, b, c, d) |
                             Adjective::Indefinite(a, b, c, d) |
                             Adjective::Past(a, b, c, d) |
@@ -475,6 +506,7 @@ impl Item {
                 match &self.category {
                     Category::Adjective(adjective) => {
                         match adjective {
+                            Adjective::Descriptive(a, ..) |
                             Adjective::Demonstrative(a, _) |
                             Adjective::Negative(a, _) |
                             Adjective::ExclamativeInterrogative(a, ..) |
@@ -530,9 +562,9 @@ impl Item {
         self.category.display_detailed(&self.english, &self.swedish)
     }
 
-    // fn from_old(old: ItemOld) -> Self {
-    //     Self { swedish: old.swedish, english: old.english, category: Category::from_old(old.category), category_int: old.category_int }
-    // }
+    fn from_old(old: ItemOld) -> Self {
+        Self { swedish: old.swedish, english: old.english, category: Category::from_old(old.category), category_int: old.category_int }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -589,10 +621,10 @@ pub struct Search {
     items: Vec<Item>,
 }
 
-// #[derive(Debug, Serialize, Deserialize)]
-// pub struct SearchOld {
-//     items: Vec<ItemOld>,
-// }
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SearchOld {
+    items: Vec<ItemOld>,
+}
 
 impl Search {
     pub fn get_all(&self, query: &Query, num_answers: usize) -> Vec<(String, Item)> {
@@ -725,25 +757,25 @@ impl Search {
         (**self.all_items(query).choose(rng).unwrap()).clone()
     }
 
-    // pub fn from_old(old: SearchOld) -> Self {
-    //     Self { items: old.items.iter().map(|x| Item::from_old(x.to_owned())).collect() }
-    // }
+    pub fn from_old(old: SearchOld) -> Self {
+        Self { items: old.items.iter().map(|x| Item::from_old(x.to_owned())).collect() }
+    }
 }
 
-// impl SearchOld {
-//     pub fn load_or_new(file: &str) -> Self {
-//         match File::open(file) {
-//             Ok(mut file) => {
-//                 let mut serialized_data = Vec::new();
-//                 file.read_to_end(&mut serialized_data).unwrap();
-//                 let data: Self = deserialize(&serialized_data).unwrap();
-//                 data
-//             }
-//             Err(_) => {
-//                 Self {
-//                     items: vec![],
-//                 }
-//             }
-//         }
-//     }
-// }
+impl SearchOld {
+    pub fn load_or_new(file: &str) -> Self {
+        match File::open(file) {
+            Ok(mut file) => {
+                let mut serialized_data = Vec::new();
+                file.read_to_end(&mut serialized_data).unwrap();
+                let data: Self = deserialize(&serialized_data).unwrap();
+                data
+            }
+            Err(_) => {
+                Self {
+                    items: vec![],
+                }
+            }
+        }
+    }
+}

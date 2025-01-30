@@ -90,14 +90,15 @@ fn generate_practice_question(item: Item) -> Question {
         }
         Category::Adjective(ref adjective) => {
             match adjective {
-                Adjective::Indefinite(s, _, _, _) |
-                Adjective::ExclamativeInterrogative(s, _, _, _) |
-                Adjective::Past(s, _, _, _) |
-                Adjective::Present(s, _, _, _) |
-                Adjective::Relative(s, _, _, _) |
+                Adjective::Descriptive(s, ..) |
+                Adjective::Indefinite(s, ..) |
+                Adjective::ExclamativeInterrogative(s, ..) |
+                Adjective::Past(s, ..) |
+                Adjective::Present(s, ..) |
+                Adjective::Relative(s, ..) |
                 Adjective::Demonstrative(s, _) |
                 Adjective::Negative(s, _) |
-                Adjective::Possessive(s, _, _) => Question::translate_adjective(s.clone(), item.swedish.clone().unwrap(), to_language, item),
+                Adjective::Possessive(s, ..) => Question::translate_adjective(s.clone(), item.swedish.clone().unwrap(), to_language, item),
             }
         }
         Category::Noun(ref s, _, ref plural) => {

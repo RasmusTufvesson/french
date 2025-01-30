@@ -409,6 +409,7 @@ impl eframe::App for App {
                                             ui.label(plural);
                                             ui.end_row();
                                         }
+                                        Adjective::Descriptive(male, female, plural_male, plural_female) |
                                         Adjective::Indefinite(male, female, plural_male, plural_female) |
                                         Adjective::ExclamativeInterrogative(male, female, plural_male, plural_female) |
                                         Adjective::Past(male, female, plural_male, plural_female) |
@@ -1085,7 +1086,7 @@ impl eframe::App for App {
                         .show_ui(ui, |ui| {
                             ui.selectable_value(category, Category::Noun("".to_string(), Gender::Male, "".to_string()), "Noun");
                             ui.selectable_value(category, Category::Verb("".to_string(), VerbForms::Regular("".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string())), "Verb");
-                            ui.selectable_value(category, Category::Adjective(Adjective::Indefinite("".to_string(), "".to_string(), "".to_string(), "".to_string())), "Adjective");
+                            ui.selectable_value(category, Category::Adjective(Adjective::Descriptive("".to_string(), "".to_string(), "".to_string(), "".to_string())), "Adjective");
                             ui.selectable_value(category, Category::Adverb("".to_string()), "Adverb");
                             ui.selectable_value(category, Category::Article("".to_string(), "".to_string(), "".to_string(), Some("".to_string())), "Article");
                             ui.selectable_value(category, Category::Conjunction("".to_string()), "Conjunction");
@@ -1291,6 +1292,7 @@ impl eframe::App for App {
                             egui::ComboBox::from_label("Type of adjective")
                                 .selected_text(format!("{}", adjective))
                                 .show_ui(ui, |ui| {
+                                    ui.selectable_value(adjective, Adjective::Descriptive("".to_string(), "".to_string(), "".to_string(), "".to_string()), "Descriptive");
                                     ui.selectable_value(adjective, Adjective::Indefinite("".to_string(), "".to_string(), "".to_string(), "".to_string()), "Indefinite");
                                     ui.selectable_value(adjective, Adjective::ExclamativeInterrogative("".to_string(), "".to_string(), "".to_string(), "".to_string()), "Exclamative and interrogative");
                                     ui.selectable_value(adjective, Adjective::Past("".to_string(), "".to_string(), "".to_string(), "".to_string()), "Past participle");
@@ -1302,6 +1304,7 @@ impl eframe::App for App {
                                 }
                             );
                             match adjective {
+                                Adjective::Descriptive(male, female, plural_male, plural_female) |
                                 Adjective::Indefinite(male, female, plural_male, plural_female) |
                                 Adjective::ExclamativeInterrogative(male, female, plural_male, plural_female) |
                                 Adjective::Past(male, female, plural_male, plural_female) |
