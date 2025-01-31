@@ -757,12 +757,16 @@ impl Search {
     }
 
     pub fn get_item_from_uid(&self, uid: u32) -> Option<Item> {
-        for item in &self.items {
-            if item.uid == uid {
-                return Some(item.clone());
-            }
+        // for item in &self.items {
+        //     if item.uid == uid {
+        //         return Some(item.clone());
+        //     }
+        // }
+        if let Ok(i) = self.items.binary_search_by_key(&uid, |item| item.uid) {
+            Some(self.items[i].clone())
+        } else {
+            None
         }
-        None
     }
 
     pub fn random_item(&self, query: &Query, rng: &mut ThreadRng) -> Item {
