@@ -165,7 +165,7 @@ impl App {
     }
 
     fn gen_query(&self) -> Query {
-        Query::new(&self.query_string, &self.language, self.categories.to_u16(), self.query_string.ends_with('\''))
+        Query::new(&self.query_string, &self.language, if self.tab != Tab::Sentences { self.categories.to_u16() } else { !0 }, self.query_string.ends_with('\''))
     }
 
     fn on_enter(&mut self) {
@@ -402,9 +402,15 @@ impl eframe::App for App {
                                     ui.label(format!("{} adjective", adjective.to_string()));
                                     ui.end_row();
                                     match adjective {
-                                        Adjective::Demonstrative(singular, plural) => {
-                                            ui.label("Singular");
-                                            ui.label(singular);
+                                        Adjective::Demonstrative(male, male_vowel, female, plural) => {
+                                            ui.label("Male");
+                                            ui.label(male);
+                                            ui.end_row();
+                                            ui.label("Male and vowel");
+                                            ui.label(male_vowel);
+                                            ui.end_row();
+                                            ui.label("Female");
+                                            ui.label(female);
                                             ui.end_row();
                                             ui.label("Plural");
                                             ui.label(plural);
@@ -990,6 +996,7 @@ impl eframe::App for App {
                                         let item = part.matched[index].clone();
                                         part.matched.clear();
                                         part.matched.push(item);
+                                        part.chosen = 0;
                                     }
                                 }
                             }
@@ -1175,6 +1182,7 @@ impl eframe::App for App {
                             ui.horizontal(|ui| {
                                 if ui.add(egui::TextEdit::singleline(string)).changed() {
                                     *plural = string.clone() + "s";
+                                    *gender = if string.ends_with('e') { Gender::Female } else { Gender::Male };
                                 }
                                 ui.label("French Singular");
                             });
@@ -1365,7 +1373,7 @@ impl eframe::App for App {
                                     ui.selectable_value(adjective, Adjective::Relative("".to_string(), "".to_string(), "".to_string(), "".to_string()), "Relative");
                                     ui.selectable_value(adjective, Adjective::Negative("".to_string(), "".to_string()), "Negative");
                                     ui.selectable_value(adjective, Adjective::Possessive("".to_string(), "".to_string(), "".to_string()), "Possessive");
-                                    ui.selectable_value(adjective, Adjective::Demonstrative("".to_string(), "".to_string()), "Demonstrative");
+                                    ui.selectable_value(adjective, Adjective::Demonstrative("".to_string(), "".to_string(), "".to_string(), "".to_string()), "Demonstrative");
                                 }
                             );
                             match adjective {
@@ -1396,12 +1404,18 @@ impl eframe::App for App {
                                         ui.label("Plural female");
                                     });
                                 }
-                                Adjective::Demonstrative(singular, plural) => {
+                                Adjective::Demonstrative(male, male_vowel, female, plural) => {
                                     ui.horizontal(|ui| {
-                                        if ui.add(egui::TextEdit::singleline(singular)).changed() {
-                                            *plural = utils::get_adjective_plural(singular);
-                                        }
-                                        ui.label("Singular");
+                                        ui.add(egui::TextEdit::singleline(male));
+                                        ui.label("Male");
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.add(egui::TextEdit::singleline(male_vowel));
+                                        ui.label("Male and vowel");
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.add(egui::TextEdit::singleline(female));
+                                        ui.label("Female");
                                     });
                                     ui.horizontal(|ui| {
                                         ui.add(egui::TextEdit::singleline(plural));
@@ -1795,8 +1809,9 @@ impl eframe::App for App {
                                     close = true;
                                     let swedish_val = if swedish.len() > 0 { Some(swedish.clone()) } else { None };
                                     let english_val = if english.len() > 0 { Some(english.clone()) } else { None };
+                                    let uid = self.search_sentences.get_item(*index).uid;
                                     self.search_sentences.remove_item(*index);
-                                    self.search_sentences.add_item(Item::new(swedish_val, english_val, Category::Other(french.clone()), self.search_sentences.get_item(*index).uid));
+                                    self.search_sentences.add_item(Item::new(swedish_val, english_val, Category::Other(french.clone()), uid));
                                     self.search_sentences.save(&self.search_sentences_file);
                                     reload = true;
                                 }

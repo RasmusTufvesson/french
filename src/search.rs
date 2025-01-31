@@ -130,7 +130,7 @@ impl Display for Pronoun {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Adjective {
     Descriptive(String, String, String, String),
-    Demonstrative(String, String),
+    Demonstrative(String, String, String, String),
     ExclamativeInterrogative(String, String, String, String),
     Indefinite(String, String, String, String),
     Negative(String, String),
@@ -142,6 +142,7 @@ pub enum Adjective {
 
 // #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 // pub enum AdjectiveOld {
+//     Descriptive(String, String, String, String),
 //     Demonstrative(String, String),
 //     ExclamativeInterrogative(String, String, String, String),
 //     Indefinite(String, String, String, String),
@@ -171,7 +172,7 @@ impl Display for Adjective {
 // impl Adjective {
 //     fn from_old(old: AdjectiveOld) -> Self {
 //         match old {
-//             AdjectiveOld::Demonstrative(a, b) => Self::Demonstrative(a, b),
+//             AdjectiveOld::Demonstrative(a, b) => Self::Demonstrative(a, b, "".to_string(), "".to_string()),
 //             AdjectiveOld::ExclamativeInterrogative(a, b, c, d) => Self::ExclamativeInterrogative(a, b, c, d),
 //             AdjectiveOld::Indefinite(a, b, c, d) => Adjective::Indefinite(a, b, c, d),
 //             AdjectiveOld::Negative(a, b) => Adjective::Negative(a, b),
@@ -179,6 +180,7 @@ impl Display for Adjective {
 //             AdjectiveOld::Possessive(a, b, c) => Adjective::Possessive(a, b, c),
 //             AdjectiveOld::Present(a, b, c, d) => Adjective::Present(a, b, c, d),
 //             AdjectiveOld::Relative(a, b, c, d) => Adjective::Relative(a, b, c, d),
+//             AdjectiveOld::Descriptive(a, b, c, d) => Adjective::Descriptive(a, b, c, d),
 //         }
 //     }
 // }
@@ -256,7 +258,7 @@ impl Category {
             Self::Adjective(adjective) => {
                 match adjective {
                     Adjective::Descriptive(s_m, s_f, p_m, p_f) => format!("{}/{}/{}/{} ({}, {}), descriptive adjective", s_m, s_f, p_m, p_f, swedish, english),
-                    Adjective::Demonstrative(singular, plural) => format!("{}/{} ({}, {}), demonstrative adjective", singular, plural, swedish, english),
+                    Adjective::Demonstrative(male, male_vowel, female, plural) => format!("{}/{}/{}/{} ({}, {}), demonstrative adjective", male, male_vowel, female, plural, swedish, english),
                     Adjective::ExclamativeInterrogative(s_m, s_f, p_m, p_f) => format!("{}/{}/{}/{} ({}, {}), exclamative and interrogative adjective", s_m, s_f, p_m, p_f, swedish, english),
                     Adjective::Indefinite(s_m, s_f, p_m, p_f) => format!("{}/{}/{}/{} ({}, {}), indefinite adjective", s_m, s_f, p_m, p_f, swedish, english),
                     Adjective::Negative(male, female) => format!("ne ... {}/ne ... {} ({}, {}), negative adjective", male, female, swedish, english),
@@ -387,8 +389,9 @@ pub struct Item {
 // pub struct ItemOld {
 //     pub swedish: Option<String>,
 //     pub english: Option<String>,
-//     pub category: Category,
+//     pub category: CategoryOld,
 //     category_int: u16,
+//     pub uid: u32,
 // }
 
 impl Item {
@@ -404,8 +407,8 @@ impl Item {
                     Category::Other(string) => Some(vec![string]),
                     Category::Adjective(adjective) => {
                         match adjective {
-                            Adjective::Demonstrative(a, b) |
                             Adjective::Negative(a, b) => Some(vec![a,b]),
+                            Adjective::Demonstrative(a, b, c, d) |
                             Adjective::Descriptive(a, b, c, d) |
                             Adjective::ExclamativeInterrogative(a, b, c, d) |
                             Adjective::Indefinite(a, b, c, d) |
@@ -508,7 +511,7 @@ impl Item {
                     Category::Adjective(adjective) => {
                         match adjective {
                             Adjective::Descriptive(a, ..) |
-                            Adjective::Demonstrative(a, _) |
+                            Adjective::Demonstrative(a, ..) |
                             Adjective::Negative(a, _) |
                             Adjective::ExclamativeInterrogative(a, ..) |
                             Adjective::Indefinite(a, ..) |
@@ -563,8 +566,8 @@ impl Item {
         self.category.display_detailed(&self.english, &self.swedish)
     }
 
-    // fn from_old(old: ItemOld, uid: u32) -> Self {
-    //     Self { swedish: old.swedish, english: old.english, category: old.category, category_int: old.category_int, uid }
+    // fn from_old(old: ItemOld) -> Self {
+    //     Self { swedish: old.swedish, english: old.english, category: Category::from_old(old.category), category_int: old.category_int, uid: old.uid }
     // }
 }
 
@@ -626,6 +629,7 @@ pub struct Search {
 // #[derive(Debug, Serialize, Deserialize)]
 // pub struct SearchOld {
 //     items: Vec<ItemOld>,
+//     uid_counter: u32,
 // }
 
 impl Search {
@@ -780,13 +784,13 @@ impl Search {
     }
 
     // pub fn from_old(old: SearchOld) -> Self {
-    //     // Self { items: old.items.iter().map(|x| Item::from_old(x.to_owned())).collect() }
-    //     let mut uid_counter = 0;
-    //     println!("{:?}", old.items);
-    //     Self { items: old.items.iter().map(|i| {
-    //         uid_counter += 1;
-    //         Item::from_old(i.clone(), uid_counter - 1)
-    //     }).collect(), uid_counter }
+    //     Self { items: old.items.iter().map(|x| Item::from_old(x.to_owned())).collect(), uid_counter: old.uid_counter }
+    //     // let mut uid_counter = 0;
+    //     // println!("{:?}", old.items);
+    //     // Self { items: old.items.iter().map(|i| {
+    //     //     uid_counter += 1;
+    //     //     Item::from_old(i.clone(), uid_counter - 1)
+    //     // }).collect(), uid_counter }
     // }
 }
 
@@ -800,9 +804,7 @@ impl Search {
 //                 data
 //             }
 //             Err(_) => {
-//                 Self {
-//                     items: vec![],
-//                 }
+//                 panic!("Cannot open file for migration")
 //             }
 //         }
 //     }

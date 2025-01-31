@@ -14,11 +14,10 @@ pub fn generate(words: &Search, subject: Option<Item>, verb: Option<Item>) -> Ve
             sentence.push(((**match pronoun.as_str() {
                 "je" => vec![je, imp_je],
                 "tu" => vec![tu, imp_tu],
-                "il" | "elle" | "on" => vec![il, imp_il],
                 "nous" => vec![nous, imp_nous],
                 "vous" => vec![vous, imp_vous],
                 "ils" | "elles" => vec![ils, imp_ils],
-                _ => unreachable!(),
+                _ => vec![il, imp_il],
             }.choose(&mut rng).unwrap()).clone(), verb));
         }
     }

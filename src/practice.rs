@@ -96,7 +96,7 @@ fn generate_practice_question(item: Item) -> Question {
                 Adjective::Past(s, ..) |
                 Adjective::Present(s, ..) |
                 Adjective::Relative(s, ..) |
-                Adjective::Demonstrative(s, _) |
+                Adjective::Demonstrative(s, ..) |
                 Adjective::Negative(s, _) |
                 Adjective::Possessive(s, ..) => Question::translate_adjective(s.clone(), item.swedish.clone().unwrap(), to_language, item),
             }
