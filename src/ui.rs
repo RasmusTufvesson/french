@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use eframe::{self, egui};
+use eframe::{self, egui::{self, Key, KeyboardShortcut, Modifiers}};
 use levenshtein::levenshtein;
 use crate::{explain::{explain, Part}, practice::{Practice, PracticeGroup, PracticeGroupCollection, Question, QuestionTemplate}, search::{Adjective, Category, Gender, Item, Language, Pronoun, Query, Search, VerbForms}, sentence, utils};
 
@@ -112,6 +112,7 @@ pub struct App {
     practice: Practice,
     practice_groups: PracticeGroupCollection,
     practice_groups_file: String,
+    debug: bool,
 }
 
 impl App {
@@ -133,7 +134,7 @@ impl App {
             practice: Practice::new(),
             practice_groups,
             practice_groups_file: practice_file,
-
+            debug: false,
         };
         app
     }
@@ -291,7 +292,7 @@ impl eframe::App for App {
 
         match self.tab {
             Tab::Words => {
-                egui::SidePanel::left("side_panel").show(ctx, |ui| {
+                egui::SidePanel::left("side_panel").resizable(false).show(ctx, |ui| {
                     ui.heading("Categories");
         
                     if ui.checkbox(&mut self.categories.noun, "Nouns").changed() |
@@ -310,6 +311,25 @@ impl eframe::App for App {
                 });
             }
             _ => {}
+        }
+
+        if ctx.input_mut(|state| state.consume_shortcut(&KeyboardShortcut::new(Modifiers::CTRL, Key::D))) {
+            self.debug = !self.debug;
+        }
+        if self.debug {
+            egui::SidePanel::right("debug_panel").resizable(false).show(ctx, |ui| {
+                ui.heading("Debug");
+
+                ui.label("Frame time:");
+                ui.label(format!("{:.1} ms", ctx.input(|state| state.stable_dt) * 1000.0));    
+
+                if ui.button("Fix uids").clicked() {
+                    let indices = self.practice_groups.get_group_indices(&self.search_words, &self.search_sentences);
+                    self.search_words.recreate_uids();
+                    self.search_sentences.recreate_uids();
+                    self.practice_groups.update_group_indices(&self.search_words, &self.search_sentences, indices);
+                }
+            });
         }
 
         let mut change_tab: Option<Tab> = None;
@@ -671,6 +691,10 @@ impl eframe::App for App {
                                     }
                                 }
                             }
+                            if self.debug {
+                                ui.label("Uid");
+                                ui.label(format!("{}", item.uid));
+                            }
                         });
                 }
                 Tab::Words |
@@ -693,6 +717,9 @@ impl eframe::App for App {
                                     let response = ui.label(string);
                                     response.clone().on_hover_ui_at_pointer(|ui| {
                                         ui.label(format!("{}", item.tooltip()));
+                                        if self.debug {
+                                            ui.label(format!("Uid: {}", item.uid));
+                                        }
                                     });
                                     response.context_menu(|ui| {
                                         if ui.button("Details").clicked() {
@@ -750,6 +777,9 @@ impl eframe::App for App {
                                     let response = ui.label(string);
                                     response.clone().on_hover_ui_at_pointer(|ui| {
                                         ui.label(format!("{}", item.tooltip()));
+                                        if self.debug {
+                                            ui.label(format!("Uid: {}", item.uid));
+                                        }
                                     });
                                     response.context_menu(|ui| {
                                         if ui.button("Explain").clicked() {
@@ -1760,8 +1790,7 @@ impl eframe::App for App {
                                     if self.tab == Tab::Details(self.search_words.get_item(*index)) {
                                         self.tab = Tab::Details(item.clone())
                                     }
-                                    self.search_words.remove_item(*index);
-                                    self.search_words.add_item(item);
+                                    self.search_words.edit_item(*index, item);
                                     self.search_words.save(&self.search_words_file);
                                     reload = true;
                                 }
@@ -1808,8 +1837,7 @@ impl eframe::App for App {
                                     let swedish_val = if swedish.len() > 0 { Some(swedish.clone()) } else { None };
                                     let english_val = if english.len() > 0 { Some(english.clone()) } else { None };
                                     let uid = self.search_sentences.get_item(*index).uid;
-                                    self.search_sentences.remove_item(*index);
-                                    self.search_sentences.add_item(Item::new(swedish_val, english_val, Category::Other(french.clone()), uid));
+                                    self.search_words.edit_item(*index, Item::new(swedish_val, english_val, Category::Other(french.clone()), uid));
                                     self.search_sentences.save(&self.search_sentences_file);
                                     reload = true;
                                 }

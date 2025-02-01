@@ -301,6 +301,27 @@ impl PracticeGroupCollection {
         let _ = self.groups.remove(index);
     }
 
+    pub fn get_group_indices(&self, search_words: &Search, search_sentences: &Search) -> Vec<Vec<usize>> {
+        self.groups.iter().map(|g| g.questions.iter().map(|q| {
+            match q {
+                QuestionTemplate::Sentence(uid) => search_sentences.get_index_from_uid(*uid).unwrap(),
+                QuestionTemplate::Word(uid) => search_words.get_index_from_uid(*uid).unwrap(),
+            }
+        }).collect()).collect()
+    }
+
+    pub fn update_group_indices(&mut self, search_words: &Search, search_sentences: &Search, indices: Vec<Vec<usize>>) {
+        for (group, group_indices) in self.groups.iter_mut().zip(indices) {
+            for (question, index) in group.questions.iter_mut().zip(group_indices) {
+                let new = match question {
+                    QuestionTemplate::Sentence(_) => QuestionTemplate::Sentence(search_sentences.get_item(index).uid),
+                    QuestionTemplate::Word(_) => QuestionTemplate::Word(search_words.get_item(index).uid),
+                };
+                *question = new;
+            }
+        }
+    }
+
     // pub fn from_old(old: PracticeGroupCollectionOld) -> Self {
     //     Self { groups: old.groups.iter().map(|g| PracticeGroup::from_old(g.clone())).collect() }
     // }

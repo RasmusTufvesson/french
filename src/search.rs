@@ -760,13 +760,21 @@ impl Search {
         self.items[index].clone()
     }
 
+    pub fn edit_item(&mut self, index: usize, new_item: Item) {
+        self.items[index] = new_item;
+    }
+
+    pub fn get_index_from_uid(&self, uid: u32) -> Option<usize> {
+        self.items.binary_search_by_key(&uid, |item| item.uid).ok()
+    }
+
     pub fn get_item_from_uid(&self, uid: u32) -> Option<Item> {
         // for item in &self.items {
         //     if item.uid == uid {
         //         return Some(item.clone());
         //     }
         // }
-        if let Ok(i) = self.items.binary_search_by_key(&uid, |item| item.uid) {
+        if let Some(i) = self.get_index_from_uid(uid) {
             Some(self.items[i].clone())
         } else {
             None
@@ -781,6 +789,15 @@ impl Search {
         let out = self.uid_counter;
         self.uid_counter += 1;
         out
+    }
+
+    pub fn recreate_uids(&mut self) {
+        let mut uid_counter = 0;
+        for item in &mut self.items {
+            item.uid = uid_counter;
+            uid_counter += 1;
+        }
+        self.uid_counter = uid_counter;
     }
 
     // pub fn from_old(old: SearchOld) -> Self {
