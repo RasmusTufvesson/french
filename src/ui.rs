@@ -1128,9 +1128,7 @@ impl eframe::App for App {
                             }
                         });
                     }
-                    Tab::PracticeSelect => {
-
-                    }
+                    Tab::PracticeSelect | Tab::PracticeView(_) | Tab::Example(_) => {}
                     _ => {
                         let response = ui.add_sized([width, 0.], egui::TextEdit::singleline(&mut self.query_string));
                         if response.changed() {
