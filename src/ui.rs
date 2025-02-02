@@ -15,7 +15,7 @@ enum PracticeState {
 enum Tab {
     Words,
     Sentences,
-    Details(Item),
+    Details(u32),
     Practice(PracticeState),
     Explain,
     PracticeSelect,
@@ -26,10 +26,10 @@ enum Tab {
 #[derive(PartialEq)]
 enum PopupWindow {
     None,
-    AddWord(String, String, Category, String, Option<usize>),
-    AddSentence(String, String, String, Option<usize>),
-    DeleteWord(usize),
-    DeleteSentence(usize),
+    AddWord(String, String, Category, String, Option<u32>),
+    AddSentence(String, String, String, Option<u32>),
+    DeleteWord(u32),
+    DeleteSentence(u32),
     NewGroup(String, Option<usize>),
     DeleteGroup(usize),
 }
@@ -328,6 +328,9 @@ impl eframe::App for App {
                     self.search_words.recreate_uids();
                     self.search_sentences.recreate_uids();
                     self.practice_groups.update_group_indices(&self.search_words, &self.search_sentences, indices);
+                    self.search_words.save(&self.search_words_file);
+                    self.search_sentences.save(&self.search_sentences_file);
+                    self.practice_groups.save(&self.practice_groups_file);
                 }
             });
         }
@@ -336,7 +339,8 @@ impl eframe::App for App {
         egui::CentralPanel::default().show(ctx, |ui| {
             let width = ui.available_width();
             match &self.tab {
-                Tab::Details(item) => {
+                Tab::Details(uid) => {
+                    let item = self.search_words.get_item(*uid).unwrap();
                     egui::Grid::new("verb_grid")
                         .num_columns(2)
                         .spacing([40.0, 4.0])
@@ -724,7 +728,7 @@ impl eframe::App for App {
                                     response.context_menu(|ui| {
                                         if ui.button("Details").clicked() {
                                             ui.close_menu();
-                                            self.tab = Tab::Details(item.to_owned());
+                                            self.tab = Tab::Details(item.uid);
                                             self.popup = PopupWindow::None;
                                         }
                                         if let Category::Verb(..) = item.category {
@@ -752,11 +756,11 @@ impl eframe::App for App {
                                             }, match item.english.clone() {
                                                 None => "".to_string(),
                                                 Some(val) => val,
-                                            }, item.category.clone(), "".to_string(), Some(self.search_words.get_item_index(item)));
+                                            }, item.category.clone(), "".to_string(), Some(item.uid));
                                         }
                                         if ui.button("Delete").clicked() {
                                             ui.close_menu();
-                                            self.popup = PopupWindow::DeleteWord(self.search_words.get_item_index(item));
+                                            self.popup = PopupWindow::DeleteWord(item.uid);
                                         }
                                     });
                                 }
@@ -809,11 +813,11 @@ impl eframe::App for App {
                                             }, match item.english.clone() {
                                                 None => "".to_string(),
                                                 Some(val) => val,
-                                            }, Some(self.search_sentences.get_item_index(item)));
+                                            }, Some(item.uid));
                                         }
                                         if ui.button("Delete").clicked() {
                                             ui.close_menu();
-                                            self.popup = PopupWindow::DeleteSentence(self.search_sentences.get_item_index(item));
+                                            self.popup = PopupWindow::DeleteSentence(item.uid);
                                         }
                                     });
                                 }
@@ -883,7 +887,7 @@ impl eframe::App for App {
                             response.context_menu(|ui| {
                                 if ui.button("Details").clicked() {
                                     ui.close_menu();
-                                    change_tab = Some(Tab::Details(item.clone()));
+                                    change_tab = Some(Tab::Details(item.uid));
                                     self.popup = PopupWindow::None;
                                 }
                             });
@@ -906,10 +910,10 @@ impl eframe::App for App {
                             for (i, question) in group.questions.iter().enumerate() {
                                 let (item, is_word) = match question {
                                     QuestionTemplate::Word(uid) => {
-                                        (self.search_words.get_item_from_uid(*uid), true)
+                                        (self.search_words.get_item(*uid), true)
                                     }
                                     QuestionTemplate::Sentence(uid) => {
-                                        (self.search_sentences.get_item_from_uid(*uid), false)
+                                        (self.search_sentences.get_item(*uid), false)
                                     }
                                 };
                                 if let Some(item) = item {
@@ -920,7 +924,7 @@ impl eframe::App for App {
                                         response.context_menu(|ui| {
                                             if ui.button("Details").clicked() {
                                                 ui.close_menu();
-                                                to_details = Some(item.clone());
+                                                to_details = Some(item.uid);
                                             }
                                             if ui.button("Remove").clicked() {
                                                 ui.close_menu();
@@ -931,7 +935,7 @@ impl eframe::App for App {
                                         response.context_menu(|ui| {
                                             if ui.button("Details").clicked() {
                                                 ui.close_menu();
-                                                to_details = Some(item.clone());
+                                                to_details = Some(item.uid);
                                             }
                                         });
                                     }
@@ -946,8 +950,8 @@ impl eframe::App for App {
                                 group.questions.remove(*i);
                             }
                         });
-                    if let Some(item) = to_details {
-                        self.tab = Tab::Details(item);
+                    if let Some(uid) = to_details {
+                        self.tab = Tab::Details(uid);
                     }
                 }
                 Tab::Explain => {
@@ -967,7 +971,7 @@ impl eframe::App for App {
                                     response.context_menu(|ui| {
                                         if ui.button("Details").clicked() {
                                             ui.close_menu();
-                                            self.tab = Tab::Details(part.matched[part.chosen].1.to_owned());
+                                            self.tab = Tab::Details(part.matched[part.chosen].1.uid);
                                             self.popup = PopupWindow::None;
                                         }
                                         if ui.button("Edit").clicked() {
@@ -978,11 +982,11 @@ impl eframe::App for App {
                                             }, match part.matched[part.chosen].1.english.clone() {
                                                 None => "".to_string(),
                                                 Some(val) => val,
-                                            }, part.matched[part.chosen].1.category.clone(), "".to_string(), Some(self.search_words.get_item_index(&part.matched[part.chosen].1)));
+                                            }, part.matched[part.chosen].1.category.clone(), "".to_string(), Some(part.matched[part.chosen].1.uid));
                                         }
                                         if ui.button("Delete").clicked() {
                                             ui.close_menu();
-                                            self.popup = PopupWindow::DeleteWord(self.search_words.get_item_index(&part.matched[part.chosen].1));
+                                            self.popup = PopupWindow::DeleteWord(part.matched[part.chosen].1.uid);
                                         }
                                     });
                                 } else {
@@ -1003,7 +1007,7 @@ impl eframe::App for App {
                                             }
                                             if ui.button("Details").clicked() {
                                                 ui.close_menu();
-                                                self.tab = Tab::Details(part.matched[part.chosen].1.to_owned());
+                                                self.tab = Tab::Details(part.matched[part.chosen].1.uid);
                                                 self.popup = PopupWindow::None;
                                             }
                                             if ui.button("Edit").clicked() {
@@ -1014,11 +1018,11 @@ impl eframe::App for App {
                                                 }, match part.matched[part.chosen].1.english.clone() {
                                                     None => "".to_string(),
                                                     Some(val) => val,
-                                                }, part.matched[part.chosen].1.category.clone(), "".to_string(), Some(self.search_words.get_item_index(&part.matched[part.chosen].1)));
+                                                }, part.matched[part.chosen].1.category.clone(), "".to_string(), Some(part.matched[part.chosen].1.uid));
                                             }
                                             if ui.button("Delete").clicked() {
                                                 ui.close_menu();
-                                                self.popup = PopupWindow::DeleteWord(self.search_words.get_item_index(&part.matched[part.chosen].1));
+                                                self.popup = PopupWindow::DeleteWord(part.matched[part.chosen].1.uid);
                                             }
                                         });
                                     }
@@ -1050,7 +1054,7 @@ impl eframe::App for App {
                                     response.context_menu(|ui| {
                                         if ui.button("Details").clicked() {
                                             ui.close_menu();
-                                            self.tab = Tab::Details(part.matched[part.chosen].1.to_owned());
+                                            self.tab = Tab::Details(part.matched[part.chosen].1.uid);
                                             self.popup = PopupWindow::None;
                                         }
                                         if ui.button("Edit").clicked() {
@@ -1061,11 +1065,11 @@ impl eframe::App for App {
                                             }, match part.matched[part.chosen].1.english.clone() {
                                                 None => "".to_string(),
                                                 Some(val) => val,
-                                            }, part.matched[part.chosen].1.category.clone(), "".to_string(), Some(self.search_words.get_item_index(&part.matched[part.chosen].1)));
+                                            }, part.matched[part.chosen].1.category.clone(), "".to_string(), Some(part.matched[part.chosen].1.uid));
                                         }
                                         if ui.button("Delete").clicked() {
                                             ui.close_menu();
-                                            self.popup = PopupWindow::DeleteWord(self.search_words.get_item_index(&part.matched[part.chosen].1));
+                                            self.popup = PopupWindow::DeleteWord(part.matched[part.chosen].1.uid);
                                         }
                                     });
                                 }
@@ -1088,7 +1092,7 @@ impl eframe::App for App {
                         }
                         ui.add_space(ui.spacing().item_spacing.y);
                         if ui.add_sized([width, 0.], egui::Button::new("Details")).clicked() {
-                            change_tab = Some(Tab::Details(item.to_owned()));
+                            change_tab = Some(Tab::Details(item.uid));
                             self.popup = PopupWindow::None;
                         }
                     }
@@ -1142,7 +1146,8 @@ impl eframe::App for App {
                             self.query_string.clear();
                         }
                     }
-                    Tab::Details(item) => {
+                    Tab::Details(uid) => {
+                        let item = self.search_words.get_item(*uid).unwrap();
                         ui.with_layout(egui::Layout::left_to_right(egui::Align::BOTTOM), |ui| {
                             if ui.button("Edit").clicked() {
                                 self.popup = PopupWindow::AddWord(match item.swedish.clone() {
@@ -1151,10 +1156,10 @@ impl eframe::App for App {
                                 }, match item.english.clone() {
                                     None => "".to_string(),
                                     Some(val) => val,
-                                }, item.category.clone(), "".to_string(), Some(self.search_words.get_item_index(item)));
+                                }, item.category.clone(), "".to_string(), Some(item.uid));
                             }
                             if ui.button("Delete").clicked() {
-                                self.popup = PopupWindow::DeleteWord(self.search_words.get_item_index(item));
+                                self.popup = PopupWindow::DeleteWord(item.uid);
                             }
                         });
                     }
@@ -1781,16 +1786,13 @@ impl eframe::App for App {
                                     reload = true;
                                 }
                             }
-                            Some(index) => {
+                            Some(uid) => {
                                 if ui.button("Apply").clicked() {
                                     close = true;
                                     let swedish_val = if swedish.len() > 0 { Some(swedish.clone()) } else { None };
                                     let english_val = if english.len() > 0 { Some(english.clone()) } else { None };
-                                    let item = Item::new(swedish_val, english_val, category.clone(), self.search_words.get_item(*index).uid);
-                                    if self.tab == Tab::Details(self.search_words.get_item(*index)) {
-                                        self.tab = Tab::Details(item.clone())
-                                    }
-                                    self.search_words.edit_item(*index, item);
+                                    let item = Item::new(swedish_val, english_val, category.clone(), *uid);
+                                    self.search_words.edit_item(*uid, item).unwrap();
                                     self.search_words.save(&self.search_words_file);
                                     reload = true;
                                 }
@@ -1831,13 +1833,12 @@ impl eframe::App for App {
                                     reload = true;
                                 }
                             }
-                            Some(index) => {
+                            Some(uid) => {
                                 if ui.button("Apply").clicked() {
                                     close = true;
                                     let swedish_val = if swedish.len() > 0 { Some(swedish.clone()) } else { None };
                                     let english_val = if english.len() > 0 { Some(english.clone()) } else { None };
-                                    let uid = self.search_sentences.get_item(*index).uid;
-                                    self.search_words.edit_item(*index, Item::new(swedish_val, english_val, Category::Other(french.clone()), uid));
+                                    self.search_words.edit_item(*uid, Item::new(swedish_val, english_val, Category::Other(french.clone()), *uid)).unwrap();
                                     self.search_sentences.save(&self.search_sentences_file);
                                     reload = true;
                                 }
@@ -1849,13 +1850,13 @@ impl eframe::App for App {
                     });
                 });
             }
-            PopupWindow::DeleteWord(index) => {
+            PopupWindow::DeleteWord(uid) => {
                 egui::Window::new("Delete word").collapsible(false).show(ctx, |ui| {
                     ui.label("Are you sure?");
                     ui.horizontal(|ui| {
                         if ui.button("Delete").clicked() {
                             close = true;
-                            self.search_words.remove_item(*index);
+                            self.search_words.remove_item(*uid).unwrap();
                             self.search_words.save(&self.search_words_file);
                             reload = true;
                             if let Tab::Details(_) = self.tab {
@@ -1868,13 +1869,13 @@ impl eframe::App for App {
                     });
                 });
             }
-            PopupWindow::DeleteSentence(index) => {
+            PopupWindow::DeleteSentence(uid) => {
                 egui::Window::new("Delete sentence").collapsible(false).show(ctx, |ui| {
                     ui.label("Are you sure?");
                     ui.horizontal(|ui| {
                         if ui.button("Delete").clicked() {
                             close = true;
-                            self.search_sentences.remove_item(*index);
+                            self.search_sentences.remove_item(*uid).unwrap();
                             self.search_sentences.save(&self.search_sentences_file);
                             reload = true;
                         }

@@ -748,33 +748,45 @@ impl Search {
         }
     }
 
-    pub fn get_item_index(&self, item: &Item) -> usize {
-        self.items.iter().position(|x| x == item).unwrap()
+    // pub fn get_item_index(&self, item: &Item) -> usize {
+    //     self.items.iter().position(|x| x == item).unwrap()
+    // }
+
+    pub fn remove_item(&mut self, uid: u32) -> Result<(), ()> {
+        match self.get_index(uid) {
+            Some(index) => {
+                self.items.remove(index);
+                Ok(())
+            }
+            None => Err(())
+        }
     }
 
-    pub fn remove_item(&mut self, item: usize) {
-        self.items.remove(item);
-    }
-
-    pub fn get_item(&self, index: usize) -> Item {
+    pub fn get_item_from_index(&self, index: usize) -> Item {
         self.items[index].clone()
     }
 
-    pub fn edit_item(&mut self, index: usize, new_item: Item) {
-        self.items[index] = new_item;
+    pub fn edit_item(&mut self, uid: u32, new_item: Item) -> Result<(), ()> {
+        match self.get_index(uid) {
+            Some(index) => {
+                self.items[index] = new_item;
+                Ok(())
+            }
+            None => Err(())
+        }
     }
 
-    pub fn get_index_from_uid(&self, uid: u32) -> Option<usize> {
+    pub fn get_index(&self, uid: u32) -> Option<usize> {
         self.items.binary_search_by_key(&uid, |item| item.uid).ok()
     }
 
-    pub fn get_item_from_uid(&self, uid: u32) -> Option<Item> {
+    pub fn get_item(&self, uid: u32) -> Option<Item> {
         // for item in &self.items {
         //     if item.uid == uid {
         //         return Some(item.clone());
         //     }
         // }
-        if let Some(i) = self.get_index_from_uid(uid) {
+        if let Some(i) = self.get_index(uid) {
             Some(self.items[i].clone())
         } else {
             None

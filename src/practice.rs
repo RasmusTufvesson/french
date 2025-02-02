@@ -220,10 +220,10 @@ impl Practice {
     fn gen_question(&self, words: &Search, sentences: &Search) -> Question {
         match self.templates[self.question_index] {
             QuestionTemplate::Sentence(uid) => {
-                generate_practice_question(sentences.get_item_from_uid(uid).unwrap())
+                generate_practice_question(sentences.get_item(uid).unwrap())
             }
             QuestionTemplate::Word(uid) => {
-                generate_practice_question(words.get_item_from_uid(uid).unwrap())
+                generate_practice_question(words.get_item(uid).unwrap())
             }
         }
     }
@@ -304,8 +304,8 @@ impl PracticeGroupCollection {
     pub fn get_group_indices(&self, search_words: &Search, search_sentences: &Search) -> Vec<Vec<usize>> {
         self.groups.iter().map(|g| g.questions.iter().map(|q| {
             match q {
-                QuestionTemplate::Sentence(uid) => search_sentences.get_index_from_uid(*uid).unwrap(),
-                QuestionTemplate::Word(uid) => search_words.get_index_from_uid(*uid).unwrap(),
+                QuestionTemplate::Sentence(uid) => search_sentences.get_index(*uid).unwrap(),
+                QuestionTemplate::Word(uid) => search_words.get_index(*uid).unwrap(),
             }
         }).collect()).collect()
     }
@@ -314,8 +314,8 @@ impl PracticeGroupCollection {
         for (group, group_indices) in self.groups.iter_mut().zip(indices) {
             for (question, index) in group.questions.iter_mut().zip(group_indices) {
                 let new = match question {
-                    QuestionTemplate::Sentence(_) => QuestionTemplate::Sentence(search_sentences.get_item(index).uid),
-                    QuestionTemplate::Word(_) => QuestionTemplate::Word(search_words.get_item(index).uid),
+                    QuestionTemplate::Sentence(_) => QuestionTemplate::Sentence(search_sentences.get_item_from_index(index).uid),
+                    QuestionTemplate::Word(_) => QuestionTemplate::Word(search_words.get_item_from_index(index).uid),
                 };
                 *question = new;
             }
