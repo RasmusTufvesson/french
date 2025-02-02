@@ -345,7 +345,7 @@ impl eframe::App for App {
                         .num_columns(2)
                         .spacing([40.0, 4.0])
                         .striped(true)
-                        .min_col_width(width / 2.)
+                        .min_col_width((width - 40.) / 2.)
                         .show(ui, |ui| {
                             let mut translation = false;
                             if let Some(string) = &item.swedish {
@@ -900,7 +900,7 @@ impl eframe::App for App {
                         .num_columns(3)
                         .spacing([40.0, 4.0])
                         .striped(true)
-                        .min_col_width(width / 3.)
+                        .min_col_width((width - 80.) / 3.)
                         .show(ui, |ui| {
                             let group = &mut self.practice_groups.groups[*index];
                             ui.label(&group.name);
