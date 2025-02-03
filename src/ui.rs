@@ -2,7 +2,7 @@
 
 use eframe::{self, egui::{self, Key, KeyboardShortcut, Modifiers}};
 use levenshtein::levenshtein;
-use crate::{explain::{explain, Part}, practice::{Practice, PracticeGroup, PracticeGroupCollection, Question, QuestionTemplate}, search::{Adjective, Category, Gender, Item, Language, Pronoun, Query, Search, VerbForms}, sentence, utils};
+use crate::{explain::{explain, Part}, practice::{Practice, PracticeGroup, PracticeGroupCollection, Question, QuestionTemplate}, search::{Adjective, Category, Concreteness, Countability, Gender, Item, Language, Noun, NounCategory, Pronoun, ProperOrCommon, Query, Search, VerbForms}, sentence, utils};
 
 #[derive(PartialEq)]
 enum PracticeState {
@@ -225,7 +225,7 @@ impl eframe::App for App {
                     match self.tab {
                         Tab::Words => {
                             if ui.button("Add word").clicked() {
-                                self.popup = PopupWindow::AddWord("".to_string(), "".to_string(), Category::Noun("".to_string(), Gender::Male, "".to_string()), "".to_string(), None);
+                                self.popup = PopupWindow::AddWord("".to_string(), "".to_string(), Category::Noun(Noun::default()), "".to_string(), None);
                             }
                             ui.separator();
                             egui::ComboBox::from_id_source("Language")
@@ -523,18 +523,27 @@ impl eframe::App for App {
                                     ui.label(interjection);
                                     ui.end_row();
                                 }
-                                Category::Noun(noun, gender, plural) => {
-                                    ui.label("Type");
-                                    ui.label(match gender {
-                                        Gender::Male => "Male noun",
-                                        Gender::Female => "Female noun",
-                                    });
-                                    ui.end_row();
+                                Category::Noun(noun) => {
                                     ui.label("Singular");
-                                    ui.label(noun);
+                                    ui.label(&noun.singular);
                                     ui.end_row();
                                     ui.label("Plural");
-                                    ui.label(plural);
+                                    ui.label(&noun.plural);
+                                    ui.end_row();
+                                    ui.label("Gender");
+                                    ui.label(noun.gender.to_string());
+                                    ui.end_row();
+                                    ui.label("Countability");
+                                    ui.label(noun.countable.to_string());
+                                    ui.end_row();
+                                    ui.label("Concreteness");
+                                    ui.label(noun.concrete.to_string());
+                                    ui.end_row();
+                                    ui.label("Properness");
+                                    ui.label(noun.proper.to_string());
+                                    ui.end_row();
+                                    ui.label("Category");
+                                    ui.label(noun.category.to_string());
                                     ui.end_row();
                                 }
                                 Category::Number(cardinal, cardinal_female, ordinal, ordinal_female, multiplicative, approximate, fraction, fraction_other) => {
@@ -1189,7 +1198,7 @@ impl eframe::App for App {
                     egui::ComboBox::from_label("Category")
                         .selected_text(format!("{}", category))
                         .show_ui(ui, |ui| {
-                            ui.selectable_value(category, Category::Noun("".to_string(), Gender::Male, "".to_string()), "Noun");
+                            ui.selectable_value(category, Category::Noun(Noun::default()), "Noun");
                             ui.selectable_value(category, Category::Verb("".to_string(), VerbForms::Regular("".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string())), "Verb");
                             ui.selectable_value(category, Category::Adjective(Adjective::Descriptive("".to_string(), "".to_string(), "".to_string(), "".to_string())), "Adjective");
                             ui.selectable_value(category, Category::Adverb("".to_string()), "Adverb");
@@ -1211,23 +1220,53 @@ impl eframe::App for App {
                         ui.label("English");
                     });
                     match category {
-                        Category::Noun(string, gender, plural) => {
+                        Category::Noun(noun) => {
                             ui.horizontal(|ui| {
-                                if ui.add(egui::TextEdit::singleline(string)).changed() {
-                                    *plural = string.clone() + "s";
-                                    *gender = if string.ends_with('e') { Gender::Female } else { Gender::Male };
+                                if ui.add(egui::TextEdit::singleline(&mut noun.singular)).changed() {
+                                    noun.plural = noun.singular.clone() + "s";
+                                    noun.gender = if noun.singular.ends_with('e') { Gender::Female } else { Gender::Male };
                                 }
                                 ui.label("French Singular");
                             });
                             ui.horizontal(|ui| {
-                                ui.add(egui::TextEdit::singleline(plural));
+                                ui.add(egui::TextEdit::singleline(&mut noun.plural));
                                 ui.label("French Plural");
                             });
                             egui::ComboBox::from_label("Gender")
-                                .selected_text(format!("{}", gender))
+                                .selected_text(noun.gender.to_string())
                                 .show_ui(ui, |ui| {
-                                    ui.selectable_value(gender, Gender::Male, "Male");
-                                    ui.selectable_value(gender, Gender::Female, "Female");
+                                    ui.selectable_value(&mut noun.gender, Gender::Male, "Male");
+                                    ui.selectable_value(&mut noun.gender, Gender::Female, "Female");
+                                }
+                            );
+                            egui::ComboBox::from_label("Countability")
+                                .selected_text(noun.countable.to_string())
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(&mut noun.countable, Countability::Countable, "Countable");
+                                    ui.selectable_value(&mut noun.countable, Countability::Uncountable, "Uncountable");
+                                }
+                            );
+                            egui::ComboBox::from_label("Concreteness")
+                                .selected_text(noun.concrete.to_string())
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(&mut noun.concrete, Concreteness::Concrete, "Concrete");
+                                    ui.selectable_value(&mut noun.concrete, Concreteness::Abstract, "Abstract");
+                                }
+                            );
+                            egui::ComboBox::from_label("Properness")
+                                .selected_text(noun.proper.to_string())
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(&mut noun.proper, ProperOrCommon::Common, "Common");
+                                    ui.selectable_value(&mut noun.proper, ProperOrCommon::Proper, "Proper");
+                                }
+                            );
+                            egui::ComboBox::from_label("Noun Category")
+                                .selected_text(noun.category.to_string())
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(&mut noun.category, NounCategory::Object, "Object");
+                                    ui.selectable_value(&mut noun.category, NounCategory::Place, "Place");
+                                    ui.selectable_value(&mut noun.category, NounCategory::Being, "Being");
+                                    ui.selectable_value(&mut noun.category, NounCategory::Concept, "Concept");
                                 }
                             );
                         }

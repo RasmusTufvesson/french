@@ -20,6 +20,95 @@ impl Display for Gender {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Countability {
+    Countable,
+    Uncountable,
+}
+
+impl Display for Countability {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Self::Countable => "Countable",
+            Self::Uncountable => "Uncountable",
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Concreteness {
+    Concrete,
+    Abstract,
+}
+
+impl Display for Concreteness {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Self::Concrete => "Concrete",
+            Self::Abstract => "Abstract",
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ProperOrCommon {
+    Proper,
+    Common,
+}
+
+impl Display for ProperOrCommon {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Self::Proper => "Proper",
+            Self::Common => "Common",
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum NounCategory {
+    Being,
+    Place,
+    Object,
+    Concept,
+}
+
+impl Display for NounCategory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Self::Being => "Being",
+            Self::Place => "Place",
+            Self::Object => "Object",
+            Self::Concept => "Concept",
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Noun {
+    pub singular: String,
+    pub plural: String,
+    pub gender: Gender,
+    pub countable: Countability,
+    pub concrete: Concreteness,
+    pub proper: ProperOrCommon,
+    pub category: NounCategory,
+}
+
+impl Default for Noun {
+    fn default() -> Self {
+        Self {
+            singular: "".to_string(),
+            plural: "".to_string(),
+            gender: Gender::Male,
+            countable: Countability::Countable,
+            concrete: Concreteness::Concrete,
+            proper: ProperOrCommon::Common,
+            category: NounCategory::Object,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum VerbForms {
     //        je,     tu,     il,     nous,   vous,   ils,    passe composé, imp je, imp tu, imp il, imp nous, imp vous, imp ils
     Regular(  String, String, String, String, String, String, String,        String, String, String, String,   String,   String),
@@ -187,7 +276,7 @@ impl Display for Adjective {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Category {
-    Noun(String, Gender, String),
+    Noun(Noun),
     Verb(String, VerbForms),
     Adjective(Adjective),
     Article(String, String, String, Option<String>),
@@ -204,7 +293,7 @@ pub enum Category {
 // pub enum CategoryOld {
 //     Noun(String, Gender, String),
 //     Verb(String, VerbForms),
-//     Adjective(AdjectiveOld),
+//     Adjective(Adjective),
 //     Article(String, String, String, Option<String>),
 //     Conjunction(String),
 //     Pronoun(Pronoun),
@@ -243,10 +332,10 @@ impl Category {
         };
         match self {
             Self::Other(string) => format!("{} ({}, {})", string, swedish, english),
-            Self::Noun(string, gender, plural) => {
-                match gender {
-                    Gender::Male => format!("{}/{} ({}, {}), masculine noun", string, plural, swedish, english),
-                    Gender::Female => format!("{}/{} ({}, {}), feminine noun", string, plural, swedish, english),
+            Self::Noun(noun) => {
+                match noun.gender {
+                    Gender::Male => format!("{}/{} ({}, {}), masculine noun", noun.singular, noun.plural, swedish, english),
+                    Gender::Female => format!("{}/{} ({}, {}), feminine noun", noun.singular, noun.plural, swedish, english),
                 }
             }
             Self::Verb(name, forms) => {
@@ -343,12 +432,14 @@ impl Category {
 
     // fn from_old(old: CategoryOld) -> Self {
     //     match old {
-    //         CategoryOld::Adjective(a) => Self::Adjective(Adjective::from_old(a)),
+    //         CategoryOld::Adjective(a) => Self::Adjective(a),
     //         CategoryOld::Article(a, b, c, d) => Self::Article(a, b, c, d),
     //         CategoryOld::Adverb(a) => Self::Adverb(a),
     //         CategoryOld::Conjunction(a) => Self::Conjunction(a),
     //         CategoryOld::Interjection(a) => Self::Interjection(a),
-    //         CategoryOld::Noun(a, b, c) => Self::Noun(a, b, c),
+    //         CategoryOld::Noun(a, b, c) => Self::Noun(Noun {
+    //             singular: a, plural: c, gender: b, countable: Countability::Countable, concrete: Concreteness::Concrete, proper: ProperOrCommon::Common, category: NounCategory::Object
+    //         }),
     //         CategoryOld::Other(a) => Self::Other(a),
     //         CategoryOld::Preposition(a) => Self::Preposition(a),
     //         CategoryOld::Pronoun(a) => Self::Pronoun(a),
@@ -418,7 +509,7 @@ impl Item {
                             Adjective::Possessive(a, b, c) => Some(vec![a, b, c]),
                         }
                     }
-                    Category::Noun(string, _, plural) => Some(vec![string, plural]),
+                    Category::Noun(noun) => Some(vec![&noun.singular, &noun.plural]),
                     Category::Verb(base, form) => {
                         match form {
                             VerbForms::Regular(je, tu, _, nous, vous, ils, pc, imp_je, imp_tu, imp_il, imp_nous, imp_vous, imp_ils) => Some(vec![je, tu, nous, vous, ils, base, pc, imp_je, imp_tu, imp_il, imp_nous, imp_vous, imp_ils]),
@@ -523,7 +614,6 @@ impl Item {
                     }
                     Category::Number(string, ..) |
                     Category::Other(string) |
-                    Category::Noun(string, _, _) |
                     Category::Verb(string, _) |
                     Category::Adverb(string) |
                     Category::Conjunction(string) |
@@ -545,6 +635,7 @@ impl Item {
                             Pronoun::Relative(string, _) => Some(string),
                         }
                     }
+                    Category::Noun(noun) => Some(&noun.singular),
                 }
             }
             Language::Swedish => {
@@ -814,12 +905,6 @@ impl Search {
 
     // pub fn from_old(old: SearchOld) -> Self {
     //     Self { items: old.items.iter().map(|x| Item::from_old(x.to_owned())).collect(), uid_counter: old.uid_counter }
-    //     // let mut uid_counter = 0;
-    //     // println!("{:?}", old.items);
-    //     // Self { items: old.items.iter().map(|i| {
-    //     //     uid_counter += 1;
-    //     //     Item::from_old(i.clone(), uid_counter - 1)
-    //     // }).collect(), uid_counter }
     // }
 }
 

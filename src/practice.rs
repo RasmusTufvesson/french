@@ -101,10 +101,10 @@ fn generate_practice_question(item: Item) -> Question {
                 Adjective::Possessive(s, ..) => Question::translate_adjective(s.clone(), item.swedish.clone().unwrap(), to_language, item),
             }
         }
-        Category::Noun(ref s, _, ref plural) => {
+        Category::Noun(ref noun) => {
             match thread_rng().gen_range(0..=1) {
-                0 => Question::translate(s.clone(), item.swedish.clone().unwrap(), to_language, item),
-                _ => Question::translate_plural(plural.clone(), item.swedish.clone().unwrap(), to_language, item),
+                0 => Question::translate(noun.singular.clone(), item.swedish.clone().unwrap(), to_language, item),
+                _ => Question::translate_plural(noun.plural.clone(), item.swedish.clone().unwrap(), to_language, item),
             }
             
         }
