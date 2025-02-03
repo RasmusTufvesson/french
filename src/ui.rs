@@ -230,7 +230,7 @@ impl eframe::App for App {
                                 self.popup = PopupWindow::AddWord("".to_string(), "".to_string(), Category::Noun(Noun::default()), "".to_string(), None);
                             }
                             ui.separator();
-                            egui::ComboBox::from_id_source("Language")
+                            egui::ComboBox::from_id_salt("Language")
                                 .selected_text(format!("{}", self.language))
                                 .show_ui(ui, |ui| {
                                     if ui.selectable_value(&mut self.language, Language::French, "French").clicked() |
@@ -250,7 +250,7 @@ impl eframe::App for App {
                                 self.popup = PopupWindow::AddSentence("".to_string(), "".to_string(), "".to_string(), None);
                             }
                             ui.separator();
-                            egui::ComboBox::from_id_source("Language")
+                            egui::ComboBox::from_id_salt("Language")
                                 .selected_text(format!("{}", self.language))
                                 .show_ui(ui, |ui| {
                                     if ui.selectable_value(&mut self.language, Language::French, "French").clicked() |
@@ -1164,7 +1164,7 @@ impl eframe::App for App {
                             if clicked {
                                 if let Some(mut state) = egui::TextEdit::load_state(ui.ctx(), response.id) {
                                     let ccursor = egui::text::CCursor::new(self.query_string.chars().count());
-                                    state.set_ccursor_range(Some(egui::text::CCursorRange::one(ccursor)));
+                                    state.cursor.set_char_range(Some(egui::text::CCursorRange::one(ccursor)));
                                     state.store(ui.ctx(), response.id);
                                 }
                             }
@@ -1223,7 +1223,7 @@ impl eframe::App for App {
         match &mut self.popup {
             PopupWindow::None => {}
             PopupWindow::AddWord(swedish, english, ref mut category, any_verb, edit) => {
-                egui::Window::new("Add word").collapsible(false).show(ctx, |ui| {
+                egui::Window::new("Add word").resizable([false, false]).show(ctx, |ui| {
                     egui::ComboBox::from_label("Category")
                         .selected_text(format!("{}", category))
                         .show_ui(ui, |ui| {
@@ -1873,7 +1873,7 @@ impl eframe::App for App {
                 });
             }
             PopupWindow::AddSentence(french, swedish, english, edit) => {
-                egui::Window::new("Add sentence").collapsible(false).show(ctx, |ui| {
+                egui::Window::new("Add sentence").resizable([false, false]).show(ctx, |ui| {
                     ui.horizontal(|ui| {
                         if ui.add(egui::TextEdit::singleline(french)).changed() {
                             *french = french.to_lowercase();
@@ -1919,7 +1919,7 @@ impl eframe::App for App {
                 });
             }
             PopupWindow::DeleteWord(uid) => {
-                egui::Window::new("Delete word").collapsible(false).show(ctx, |ui| {
+                egui::Window::new("Delete word").resizable([false, false]).show(ctx, |ui| {
                     ui.label("Are you sure?");
                     ui.horizontal(|ui| {
                         if ui.button("Delete").clicked() {
@@ -1938,7 +1938,7 @@ impl eframe::App for App {
                 });
             }
             PopupWindow::DeleteSentence(uid) => {
-                egui::Window::new("Delete sentence").collapsible(false).show(ctx, |ui| {
+                egui::Window::new("Delete sentence").resizable([false, false]).show(ctx, |ui| {
                     ui.label("Are you sure?");
                     ui.horizontal(|ui| {
                         if ui.button("Delete").clicked() {
@@ -1954,7 +1954,7 @@ impl eframe::App for App {
                 });
             }
             PopupWindow::NewGroup(name, index) => {
-                egui::Window::new("New group").collapsible(false).show(ctx, |ui| {
+                egui::Window::new("New group").resizable([false, false]).show(ctx, |ui| {
                     ui.horizontal(|ui| {
                         ui.add(egui::TextEdit::singleline(name));
                         ui.label("Name");
@@ -1984,7 +1984,7 @@ impl eframe::App for App {
                 });
             }
             PopupWindow::DeleteGroup(index) => {
-                egui::Window::new("Delete group").collapsible(false).show(ctx, |ui| {
+                egui::Window::new("Delete group").resizable([false, false]).show(ctx, |ui| {
                     ui.label("Are you sure?");
                     ui.horizontal(|ui| {
                         if ui.button("Delete").clicked() {
@@ -2019,6 +2019,6 @@ pub fn run(search_words: Search, search_sentences: Search, practice_groups: Prac
     eframe::run_native(
         "French",
         native_options,
-        Box::new(|cc| Box::new(App::new(cc, search_words, search_sentences, practice_groups, search_words_file, search_sentences_file, practice_file))),
+        Box::new(|cc| Ok(Box::new(App::new(cc, search_words, search_sentences, practice_groups, search_words_file, search_sentences_file, practice_file)))),
     )
 }
