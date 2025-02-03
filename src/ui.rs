@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use eframe::{self, egui::{self, Key, KeyboardShortcut, Modifiers}};
+use eframe::{self, egui::{self, Align, Key, KeyboardShortcut, Modifiers}};
 use levenshtein::levenshtein;
 use crate::{explain::{explain, Part}, practice::{Practice, PracticeGroup, PracticeGroupCollection, Question, QuestionTemplate}, search::{Adjective, Category, Concreteness, Countability, Gender, Item, Language, Noun, NounCategory, Pronoun, ProperOrCommon, Query, Search, VerbForms}, sentence, utils};
 
@@ -113,6 +113,7 @@ pub struct App {
     practice_groups: PracticeGroupCollection,
     practice_groups_file: String,
     debug: bool,
+    reset_scroll: bool,
 }
 
 impl App {
@@ -135,6 +136,7 @@ impl App {
             practice_groups,
             practice_groups_file: practice_file,
             debug: false,
+            reset_scroll: false,
         };
         app
     }
@@ -306,6 +308,7 @@ impl eframe::App for App {
                     ui.checkbox(&mut self.categories.pronoun, "Pronouns").changed() |
                     ui.checkbox(&mut self.categories.number, "Numbers").changed() |
                     ui.checkbox(&mut self.categories.other, "Other").changed() {
+                        self.reset_scroll = true;
                         self.gen_results();
                     }
                 });
@@ -716,123 +719,146 @@ impl eframe::App for App {
                     ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
                         match self.tab {
                             Tab::Words => {
-                                let num_results = ((ui.available_height() - 24.0) / 17.0).round() as usize;
-                                if num_results != self.min_num_answers {
-                                    self.min_num_answers = num_results;
-                                    if self.min_num_answers > self.num_answers {
-                                        self.gen_results();
-                                    }
+                                // let num_results = ((ui.available_height() - 24.0) / 17.0).round() as usize;
+                                if self.min_num_answers < 100 || self.reset_scroll {
+                                    self.min_num_answers = 100;
                                 }
-                                for (i, (string, item)) in self.results_search.iter().enumerate() {
-                                    if i >= self.min_num_answers {
-                                        break;
-                                    }
-                                    let response = ui.label(string);
-                                    response.clone().on_hover_ui_at_pointer(|ui| {
-                                        ui.label(format!("{}", item.tooltip()));
-                                        if self.debug {
-                                            ui.label(format!("Uid: {}", item.uid));
-                                        }
-                                    });
-                                    response.context_menu(|ui| {
-                                        if ui.button("Details").clicked() {
-                                            ui.close_menu();
-                                            self.tab = Tab::Details(item.uid);
-                                            self.popup = PopupWindow::None;
-                                        }
-                                        if let Category::Verb(..) = item.category {
-                                            if ui.button("Example").clicked() {
-                                                ui.close_menu();
-                                                self.tab = Tab::Example(sentence::generate(&self.search_words, None, Some(item.clone())));
-                                                self.popup = PopupWindow::None;
-                                            }
-                                        }
-                                        ui.menu_button("Add to practice group", |ui| {
-                                            for group in &mut self.practice_groups.groups {
-                                                if ui.button(&group.name).clicked() {
-                                                    ui.close_menu();
-                                                    group.questions.push(QuestionTemplate::Word(item.uid));
-                                                    self.practice_groups.save(&self.practice_groups_file);
-                                                    break;
-                                                }
-                                            }
-                                        });
-                                        if ui.button("Edit").clicked() {
-                                            ui.close_menu();
-                                            self.popup = PopupWindow::AddWord(match item.swedish.clone() {
-                                                None => "".to_string(),
-                                                Some(val) => val,
-                                            }, match item.english.clone() {
-                                                None => "".to_string(),
-                                                Some(val) => val,
-                                            }, item.category.clone(), "".to_string(), Some(item.uid));
-                                        }
-                                        if ui.button("Delete").clicked() {
-                                            ui.close_menu();
-                                            self.popup = PopupWindow::DeleteWord(item.uid);
-                                        }
-                                    });
-                                }
-                            }
-                            Tab::Sentences => {
-                                let num_results = ((ui.available_height() - 24.0) / 17.0).round() as usize;
-                                if num_results != self.min_num_answers {
-                                    self.min_num_answers = num_results;
-                                    if self.min_num_answers > self.num_answers {
-                                        self.gen_results();
-                                    }
-                                }
-                                let mut update_results = false;
-                                for (i, (string, item)) in self.results_search.iter().enumerate() {
-                                    if i >= self.min_num_answers {
-                                        break;
-                                    }
-                                    let response = ui.label(string);
-                                    response.clone().on_hover_ui_at_pointer(|ui| {
-                                        ui.label(format!("{}", item.tooltip()));
-                                        if self.debug {
-                                            ui.label(format!("Uid: {}", item.uid));
-                                        }
-                                    });
-                                    response.context_menu(|ui| {
-                                        if ui.button("Explain").clicked() {
-                                            ui.close_menu();
-                                            self.tab = Tab::Explain;
-                                            self.query_string = string.clone();
-                                            update_results = true;
-                                        }
-                                        ui.menu_button("Add to practice group", |ui| {
-                                            for group in &mut self.practice_groups.groups {
-                                                if ui.button(&group.name).clicked() {
-                                                    ui.close_menu();
-                                                    group.questions.push(QuestionTemplate::Sentence(item.uid));
-                                                    self.practice_groups.save(&self.practice_groups_file);
-                                                    break;
-                                                }
-                                            }
-                                        });
-                                        if ui.button("Edit").clicked() {
-                                            ui.close_menu();
-                                            self.popup = PopupWindow::AddSentence(match &item.category {
-                                                Category::Other(string) => string.clone(),
-                                                _ => "".to_string(),
-                                            }, match item.swedish.clone() {
-                                                None => "".to_string(),
-                                                Some(val) => val,
-                                            }, match item.english.clone() {
-                                                None => "".to_string(),
-                                                Some(val) => val,
-                                            }, Some(item.uid));
-                                        }
-                                        if ui.button("Delete").clicked() {
-                                            ui.close_menu();
-                                            self.popup = PopupWindow::DeleteSentence(item.uid);
-                                        }
-                                    });
-                                }
-                                if update_results {
+                                if self.num_answers != self.min_num_answers {
                                     self.gen_results();
                                 }
+                                egui::ScrollArea::vertical()
+                                    .auto_shrink([false, true])
+                                    .max_height(ui.available_height() - 26.0)
+                                    .show_rows(ui, ui.text_style_height(&egui::TextStyle::Body), self.results_search.len() + 1, |ui, row_range| {
+                                        if self.reset_scroll {
+                                            ui.scroll_to_rect(ui.cursor(), Some(Align::TOP));
+                                            self.reset_scroll = false;
+                                        }
+                                        for i in row_range.start..row_range.end.min(self.results_search.len()) {
+                                            let (string, item) = &self.results_search[i];
+                                            let response = ui.label(string);
+                                            response.clone().on_hover_ui_at_pointer(|ui| {
+                                                ui.label(format!("{}", item.tooltip()));
+                                                if self.debug {
+                                                    ui.label(format!("Uid: {}", item.uid));
+                                                }
+                                            });
+                                            response.context_menu(|ui| {
+                                                if ui.button("Details").clicked() {
+                                                    ui.close_menu();
+                                                    self.tab = Tab::Details(item.uid);
+                                                    self.popup = PopupWindow::None;
+                                                }
+                                                if let Category::Verb(..) = item.category {
+                                                    if ui.button("Example").clicked() {
+                                                        ui.close_menu();
+                                                        self.tab = Tab::Example(sentence::generate(&self.search_words, None, Some(item.clone())));
+                                                        self.popup = PopupWindow::None;
+                                                    }
+                                                }
+                                                ui.menu_button("Add to practice group", |ui| {
+                                                    for group in &mut self.practice_groups.groups {
+                                                        if ui.button(&group.name).clicked() {
+                                                            ui.close_menu();
+                                                            group.questions.push(QuestionTemplate::Word(item.uid));
+                                                            self.practice_groups.save(&self.practice_groups_file);
+                                                            break;
+                                                        }
+                                                    }
+                                                });
+                                                if ui.button("Edit").clicked() {
+                                                    ui.close_menu();
+                                                    self.popup = PopupWindow::AddWord(match item.swedish.clone() {
+                                                        None => "".to_string(),
+                                                        Some(val) => val,
+                                                    }, match item.english.clone() {
+                                                        None => "".to_string(),
+                                                        Some(val) => val,
+                                                    }, item.category.clone(), "".to_string(), Some(item.uid));
+                                                }
+                                                if ui.button("Delete").clicked() {
+                                                    ui.close_menu();
+                                                    self.popup = PopupWindow::DeleteWord(item.uid);
+                                                }
+                                            });
+                                        }
+                                        if row_range.end == self.results_search.len() + 1 {
+                                            if ui.add_enabled(self.results_search.len() == self.num_answers, egui::Button::new("Load more")).clicked() {
+                                                self.min_num_answers += 100;
+                                            }
+                                        }
+                                    });
+                            }
+                            Tab::Sentences => {
+                                if self.min_num_answers < 100 || self.reset_scroll {
+                                    self.min_num_answers = 100;
+                                }
+                                if self.num_answers != self.min_num_answers {
+                                    self.gen_results();
+                                }
+                                egui::ScrollArea::vertical()
+                                    .auto_shrink([false, true])
+                                    .max_height(ui.available_height() - 26.0)
+                                    .show_rows(ui, ui.text_style_height(&egui::TextStyle::Body), self.results_search.len() + 1, |ui, row_range| {
+                                        if self.reset_scroll {
+                                            ui.scroll_to_rect(ui.cursor(), Some(Align::TOP));
+                                            self.reset_scroll = false;
+                                        }
+                                        let mut update_results = false;
+                                        for i in row_range.start..row_range.end.min(self.results_search.len()) {
+                                            let (string, item) = &self.results_search[i];
+                                            let response = ui.label(string);
+                                            response.clone().on_hover_ui_at_pointer(|ui| {
+                                                ui.label(format!("{}", item.tooltip()));
+                                                if self.debug {
+                                                    ui.label(format!("Uid: {}", item.uid));
+                                                }
+                                            });
+                                            response.context_menu(|ui| {
+                                                if ui.button("Explain").clicked() {
+                                                    ui.close_menu();
+                                                    self.tab = Tab::Explain;
+                                                    self.query_string = string.clone();
+                                                    update_results = true;
+                                                }
+                                                ui.menu_button("Add to practice group", |ui| {
+                                                    for group in &mut self.practice_groups.groups {
+                                                        if ui.button(&group.name).clicked() {
+                                                            ui.close_menu();
+                                                            group.questions.push(QuestionTemplate::Sentence(item.uid));
+                                                            self.practice_groups.save(&self.practice_groups_file);
+                                                            break;
+                                                        }
+                                                    }
+                                                });
+                                                if ui.button("Edit").clicked() {
+                                                    ui.close_menu();
+                                                    self.popup = PopupWindow::AddSentence(match &item.category {
+                                                        Category::Other(string) => string.clone(),
+                                                        _ => "".to_string(),
+                                                    }, match item.swedish.clone() {
+                                                        None => "".to_string(),
+                                                        Some(val) => val,
+                                                    }, match item.english.clone() {
+                                                        None => "".to_string(),
+                                                        Some(val) => val,
+                                                    }, Some(item.uid));
+                                                }
+                                                if ui.button("Delete").clicked() {
+                                                    ui.close_menu();
+                                                    self.popup = PopupWindow::DeleteSentence(item.uid);
+                                                }
+                                            });
+                                        }
+                                        if update_results {
+                                            self.gen_results();
+                                        }
+                                        if row_range.end == self.results_search.len() + 1 {
+                                            if ui.add_enabled(self.results_search.len() == self.num_answers, egui::Button::new("Load more")).clicked() {
+                                                self.min_num_answers += 100;
+                                            }
+                                        }
+                                    });
                             }
                             Tab::PracticeSelect => {
                                 for (i, group) in self.practice_groups.groups.iter().enumerate() {
@@ -1176,6 +1202,9 @@ impl eframe::App for App {
                     _ => {
                         let response = ui.add_sized([width, 0.], egui::TextEdit::singleline(&mut self.query_string));
                         if response.changed() {
+                            if self.tab == Tab::Words {
+                                self.reset_scroll = true;
+                            }
                             self.gen_results();
                         }
                         if self.popup == PopupWindow::None {
